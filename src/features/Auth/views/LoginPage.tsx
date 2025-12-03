@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { toast } from "sonner";
 import { useAuth } from "@shared/context/AuthContext";
 import { Button } from "@/shared/components/ui/button";
 import {
@@ -33,7 +34,8 @@ export default function LoginPage() {
             await login({ email, password });
             navigate("/");
         } catch (error) {
-            console.error("Login failed:", error);
+            const message = error instanceof Error ? error.message : "Login failed";
+            toast.error(message);
         } finally {
             setIsLoading(false);
         }

@@ -8,6 +8,7 @@ import { useInitializeApp } from "../hooks/useInitializeApp";
 import { ThemeProvider } from "@shared/components/ui";
 import { AuthProvider } from "@shared/context/AuthContext";
 import { ProtectedRoute } from "@shared/components/ProtectedRoute";
+import { Toaster } from "@shared/components/ui/sonner";
 
 const queryClient = new QueryClient();
 
@@ -35,6 +36,7 @@ const AppRoutes = () => {
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
           </AuthProvider>
+          <Toaster richColors position="top-right" />
         </QueryClientProvider>
       </BrowserRouter>
     </ThemeProvider>

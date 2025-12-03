@@ -1,68 +1,94 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
 import type { User, AuthState, LoginCredentials, SignupCredentials } from "@features/Auth/types";
 
+const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
+
 interface AuthContextType extends AuthState {
     login: (credentials: LoginCredentials) => Promise<void>;
     signup: (credentials: SignupCredentials) => Promise<void>;
-    logout: () => void;
+    logout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+async function apiRequest<T>(url: string, method: string, body?: unknown): Promise<T> {
+    const options: RequestInit = {
+        method,
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+    };
+    if (body) options.body = JSON.stringify(body);
+
+    const res = await fetch(`${API_BASE_URL}${url}`, options);
+    if (!res.ok) {
+        const error = await res.json().catch(() => ({ message: "Request failed" }));
+        throw new Error(error.message || "Request failed");
+    }
+    return res.json();
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
     const [user, setUser] = useState<User | null>(null);
     const [isAuthenticated, setIsAuthenticated] = useState(false);
+    const [isLoading, setIsLoading] = useState(true);
 
-    // Load user from localStorage on mount
+    // Check session on mount
     useEffect(() => {
-        const storedUser = localStorage.getItem("auth_user");
-        if (storedUser) {
-            try {
-                const parsedUser = JSON.parse(storedUser);
-                setUser(parsedUser);
-                setIsAuthenticated(true);
-            } catch (error) {
-                console.error("Failed to parse stored user:", error);
-                localStorage.removeItem("auth_user");
-            }
-        }
+        checkSession();
     }, []);
 
+    const checkSession = async () => {
+        try {
+            const session = await apiRequest<{ user: User }>("/me", "GET");
+            if (session?.user) {
+                setUser(session.user);
+                setIsAuthenticated(true);
+            }
+        } catch {
+            setUser(null);
+            setIsAuthenticated(false);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
     const login = async (credentials: LoginCredentials) => {
-        // Mock login - in real app, this would call an API
-        await new Promise((resolve) => setTimeout(resolve, 500));
-
-        const mockUser: User = {
-            id: "1",
-            name: credentials.email.split("@")[0],
+        const response = await apiRequest<{ user: User }>("/api/auth/sign-in/email", "POST", {
             email: credentials.email,
-        };
+            password: credentials.password,
+        });
 
-        setUser(mockUser);
-        setIsAuthenticated(true);
-        localStorage.setItem("auth_user", JSON.stringify(mockUser));
+        if (response?.user) {
+            setUser(response.user);
+            setIsAuthenticated(true);
+        }
     };
 
     const signup = async (credentials: SignupCredentials) => {
-        // Mock signup - in real app, this would call an API
-        await new Promise((resolve) => setTimeout(resolve, 500));
-
-        const mockUser: User = {
-            id: Date.now().toString(),
+        const response = await apiRequest<{ user: User }>("/api/auth/sign-up/email", "POST", {
             name: credentials.name,
             email: credentials.email,
-        };
+            password: credentials.password,
+        });
 
-        setUser(mockUser);
-        setIsAuthenticated(true);
-        localStorage.setItem("auth_user", JSON.stringify(mockUser));
+        if (response?.user) {
+            setUser(response.user);
+            setIsAuthenticated(true);
+        }
     };
 
-    const logout = () => {
-        setUser(null);
-        setIsAuthenticated(false);
-        localStorage.removeItem("auth_user");
+    const logout = async () => {
+        try {
+            await apiRequest("/api/auth/sign-out", "POST");
+        } finally {
+            setUser(null);
+            setIsAuthenticated(false);
+        }
     };
+
+    if (isLoading) {
+        return null; // Or a loading spinner
+    }
 
     return (
         <AuthContext.Provider value={{ user, isAuthenticated, login, signup, logout }}>

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { toast } from "sonner";
 import { useAuth } from "@shared/context/AuthContext";
 import { Button } from "@/shared/components/ui/button";
 import {
@@ -31,11 +32,19 @@ export default function SignupPage() {
         e.preventDefault();
         setIsLoading(true);
 
+        if (password !== confirmPassword) {
+            toast.error("Passwords do not match");
+            setIsLoading(false);
+            return;
+        }
+
         try {
             await signup({ name, email, password });
+            toast.success("Account created successfully!");
             navigate("/");
         } catch (error) {
-            console.error("Signup failed:", error);
+            const message = error instanceof Error ? error.message : "Signup failed";
+            toast.error(message);
         } finally {
             setIsLoading(false);
         }
