@@ -1,0 +1,11 @@
+{
+	"folders": [
+		{
+			"path": "../nestjs-api-starter"
+		},
+		{
+			"path": "."
+		}
+	],
+	"settings": {}
+}
