@@ -1,7 +1,13 @@
 import { BrowserRouter, Route, Routes, Navigate } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import "../styles/globals.css";
-import { LoginPage, SignupPage } from "@features/Auth";
+import {
+  LoginPage,
+  SignupPage,
+  VerifyEmailPage,
+  ForgotPasswordPage,
+  SetNewPasswordPage,
+} from "@features/Auth";
 import { DashboardPage } from "@features/Dashboard";
 import RootLayout from "./RootLayout";
 import { useInitializeApp } from "../hooks/useInitializeApp";
@@ -21,8 +27,14 @@ const AppRoutes = () => {
         <QueryClientProvider client={queryClient}>
           <AuthProvider>
             <Routes>
+              {/* Auth routes */}
               <Route path="/login" element={<LoginPage />} />
               <Route path="/signup" element={<SignupPage />} />
+              <Route path="/verify-email" element={<VerifyEmailPage />} />
+              <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+              <Route path="/set-new-password" element={<SetNewPasswordPage />} />
+
+              {/* Protected routes */}
               <Route
                 path="/"
                 element={

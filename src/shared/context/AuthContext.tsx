@@ -1,97 +1,119 @@
-import React, { createContext, useContext, useState, useEffect } from "react";
+import React, { createContext, useContext } from "react";
 import type { User, AuthState, LoginCredentials, SignupCredentials } from "@features/Auth/types";
+import { useSession, signIn, signUp, signOut } from "@shared/lib/auth-client";
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
 
 interface AuthContextType extends AuthState {
+    isLoading: boolean;
     login: (credentials: LoginCredentials) => Promise<void>;
     signup: (credentials: SignupCredentials) => Promise<void>;
     logout: () => Promise<void>;
+    forgotPassword: (email: string) => Promise<void>;
+    resetPassword: (token: string, newPassword: string) => Promise<void>;
+    sendVerificationEmail: (email: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-async function apiRequest<T>(url: string, method: string, body?: unknown): Promise<T> {
-    const options: RequestInit = {
-        method,
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-    };
-    if (body) options.body = JSON.stringify(body);
-
-    const res = await fetch(`${API_BASE_URL}${url}`, options);
-    if (!res.ok) {
-        const error = await res.json().catch(() => ({ message: "Request failed" }));
-        throw new Error(error.message || "Request failed");
-    }
-    return res.json();
-}
-
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-    const [user, setUser] = useState<User | null>(null);
-    const [isAuthenticated, setIsAuthenticated] = useState(false);
-    const [isLoading, setIsLoading] = useState(true);
+    // Use Better Auth's useSession hook
+    const { data: session, isPending: isLoading } = useSession();
 
-    // Check session on mount
-    useEffect(() => {
-        checkSession();
-    }, []);
+    const user: User | null = session?.user ? {
+        id: session.user.id,
+        name: session.user.name,
+        email: session.user.email,
+    } : null;
 
-    const checkSession = async () => {
-        try {
-            const session = await apiRequest<{ user: User }>("/me", "GET");
-            if (session?.user) {
-                setUser(session.user);
-                setIsAuthenticated(true);
-            }
-        } catch {
-            setUser(null);
-            setIsAuthenticated(false);
-        } finally {
-            setIsLoading(false);
-        }
-    };
+    const isAuthenticated = !!session?.user;
 
     const login = async (credentials: LoginCredentials) => {
-        const response = await apiRequest<{ user: User }>("/api/auth/sign-in/email", "POST", {
+        const result = await signIn.email({
             email: credentials.email,
             password: credentials.password,
         });
 
-        if (response?.user) {
-            setUser(response.user);
-            setIsAuthenticated(true);
+        if (result.error) {
+            throw new Error(result.error.message || "Login failed");
         }
     };
 
     const signup = async (credentials: SignupCredentials) => {
-        const response = await apiRequest<{ user: User }>("/api/auth/sign-up/email", "POST", {
+        const result = await signUp.email({
             name: credentials.name,
             email: credentials.email,
             password: credentials.password,
         });
 
-        if (response?.user) {
-            setUser(response.user);
-            setIsAuthenticated(true);
+        if (result.error) {
+            throw new Error(result.error.message || "Signup failed");
         }
     };
 
     const logout = async () => {
-        try {
-            await apiRequest("/api/auth/sign-out", "POST");
-        } finally {
-            setUser(null);
-            setIsAuthenticated(false);
+        await signOut();
+    };
+
+    const forgotPassword = async (email: string) => {
+        const response = await fetch(`${API_BASE_URL}/api/auth/request-password-reset`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            credentials: "include",
+            body: JSON.stringify({
+                email,
+                redirectTo: `${window.location.origin}/set-new-password`,
+            }),
+        });
+
+        if (!response.ok) {
+            const error = await response.json().catch(() => ({ message: "Request failed" }));
+            throw new Error(error.message || "Failed to send reset email");
         }
     };
 
-    if (isLoading) {
-        return null; // Or a loading spinner
-    }
+    const resetPassword = async (token: string, newPassword: string) => {
+        const response = await fetch(`${API_BASE_URL}/api/auth/reset-password`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            credentials: "include",
+            body: JSON.stringify({ token, newPassword }),
+        });
+
+        if (!response.ok) {
+            const error = await response.json().catch(() => ({ message: "Request failed" }));
+            throw new Error(error.message || "Failed to reset password");
+        }
+    };
+
+    const sendVerificationEmail = async (email: string) => {
+        const response = await fetch(`${API_BASE_URL}/api/auth/send-verification-email`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            credentials: "include",
+            body: JSON.stringify({ email }),
+        });
+
+        if (!response.ok) {
+            const error = await response.json().catch(() => ({ message: "Request failed" }));
+            throw new Error(error.message || "Failed to send verification email");
+        }
+    };
 
     return (
-        <AuthContext.Provider value={{ user, isAuthenticated, login, signup, logout }}>
+        <AuthContext.Provider
+            value={{
+                user,
+                isAuthenticated,
+                isLoading,
+                login,
+                signup,
+                logout,
+                forgotPassword,
+                resetPassword,
+                sendVerificationEmail,
+            }}
+        >
             {children}
         </AuthContext.Provider>
     );

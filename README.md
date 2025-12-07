@@ -1,6 +1,6 @@
-# 🚀 React SPA API Starter
+# 🚀 React SPA API Starter with Better Auth
 
-A modern, production-ready React Single Page Application (SPA) starter template built with **Vite**, **TypeScript**, and a **feature-folder architecture**. This project demonstrates best practices for scalable frontend applications.
+A modern, production-ready React Single Page Application (SPA) starter template built with **Vite**, **TypeScript**, **Better Auth**, and a **feature-folder architecture**. This project demonstrates best practices for scalable frontend applications with complete authentication.
 
 > 📖 **Based on:** [How to structure a React App in 2025 (SPA, SSR or Native)](https://ramonprata.medium.com/how-to-structure-a-react-app-in-2025-spa-ssr-or-native-10d8de7a245a)
 
@@ -8,13 +8,29 @@ A modern, production-ready React Single Page Application (SPA) starter template 
 
 ## 📋 Table of Contents
 
+- [Features](#-features)
 - [Quick Start](#-quick-start)
 - [Technology Stack](#-technology-stack)
+- [Authentication](#-authentication)
 - [Architecture Overview](#-architecture-overview)
 - [Project Structure](#-project-structure)
+- [E2E Testing](#-e2e-testing)
 - [Creating a New Feature](#-creating-a-new-feature)
 - [Development Guidelines](#-development-guidelines)
 - [Available Scripts](#-available-scripts)
+
+---
+
+## ✨ Features
+
+- **Complete Authentication** — Login, signup, email verification, password reset
+- **Better Auth Integration** — Modern auth client with React hooks
+- **Protected Routes** — Automatic redirect for unauthenticated users
+- **Session Management** — Secure httpOnly cookie-based sessions
+- **Feature-Folder Architecture** — Scalable and maintainable structure
+- **Modern UI** — Tailwind CSS with shadcn/ui components
+- **E2E Testing** — Playwright tests for all auth flows
+- **Type Safety** — Full TypeScript support
 
 ---
 
@@ -24,8 +40,19 @@ A modern, production-ready React Single Page Application (SPA) starter template 
 
 - **Node.js** >= 18.x
 - **npm** >= 9.x (or **yarn** / **pnpm**)
+- **Backend API** — [nestjs-api-starter](../nestjs-api-starter) running on port 3000
 
-### Installation
+### 1. Start the Backend API
+
+First, ensure the backend API is running:
+
+```bash
+cd ../nestjs-api-starter
+npm install
+npm run start:dev
+```
+
+### 2. Install and Run Frontend
 
 ```bash
 # Clone the repository
@@ -39,7 +66,15 @@ npm install
 npm run dev
 ```
 
-The application will be available at **http://localhost:5173** (default Vite port)
+The application will be available at **http://localhost:5173**
+
+### 3. Configure Environment (Optional)
+
+Create a `.env` file if you need to customize the API URL:
+
+```env
+VITE_API_URL=http://localhost:3000
+```
 
 ### Build for Production
 
@@ -51,34 +86,116 @@ npm run build
 npm run preview
 ```
 
-### Linting
-
-```bash
-# Run ESLint
-npm run lint
-```
-
 ---
 
 ## 🛠️ Technology Stack
 
 | Technology | Version | Purpose |
 |-----------|---------|---------|
-| **React** | 19.1.1 | UI framework |
-| **TypeScript** | 5.8.3 | Type safety |
-| **Vite** | 7.1.2 | Build tool & dev server |
-| **React Router** | 7.8.2 | Client-side routing |
-| **TanStack Query** | 5.85.5 | Server state management |
-| **Zustand** | 5.0.8 | Client state management |
-| **Immer** | 10.1.1 | Immutable state updates |
-| **Axios** | 1.7.9 | HTTP client |
-| **Sass** | 1.90.0 | CSS preprocessing |
-| **React Icons** | 5.5.0 | Icon library |
+| **React** | 19.x | UI framework |
+| **TypeScript** | 5.x | Type safety |
+| **Vite** | 7.x | Build tool & dev server |
+| **Better Auth** | 1.x | Authentication client |
+| **React Router** | 7.x | Client-side routing |
+| **TanStack Query** | 5.x | Server state management |
+| **Zustand** | 5.x | Client state management |
+| **Tailwind CSS** | 4.x | Styling |
+| **shadcn/ui** | - | UI components |
+| **Playwright** | 1.x | E2E testing |
 
 ### Dev Dependencies
 
-- **ESLint** - Code linting with TypeScript support
-- **vite-tsconfig-paths** - TypeScript path aliases in Vite
+- **ESLint** — Code linting with TypeScript support
+- **Playwright** — End-to-end testing
+- **vite-tsconfig-paths** — TypeScript path aliases in Vite
+
+---
+
+## 🔐 Authentication
+
+### Authentication Flow
+
+```
+┌──────────┐     ┌──────────┐     ┌──────────┐     ┌──────────┐
+│  Signup  │────▶│  Email   │────▶│  Verify  │────▶│  Login   │
+│  /signup │     │  Sent    │     │  /verify │     │  /login  │
+└──────────┘     └──────────┘     └──────────┘     └──────────┘
+                                                         │
+                                                         ▼
+┌──────────┐     ┌──────────┐     ┌──────────┐     ┌──────────┐
+│  Forgot  │────▶│  Reset   │────▶│  Set New │────▶│Dashboard │
+│ /forgot  │     │  Email   │     │ /set-new │     │    /     │
+└──────────┘     └──────────┘     └──────────┘     └──────────┘
+```
+
+### Auth Routes
+
+| Route | Component | Description |
+|-------|-----------|-------------|
+| `/login` | `LoginPage` | User login |
+| `/signup` | `SignupPage` | User registration |
+| `/verify-email` | `VerifyEmailPage` | Email verification |
+| `/forgot-password` | `ForgotPasswordPage` | Request password reset |
+| `/set-new-password` | `SetNewPasswordPage` | Set new password |
+
+### Using Authentication
+
+```tsx
+import { useAuth } from "@shared/context/AuthContext";
+
+function MyComponent() {
+  const { 
+    user,           // Current user or null
+    isAuthenticated,// Boolean
+    isLoading,      // Loading state
+    login,          // Login function
+    signup,         // Signup function
+    logout,         // Logout function
+    forgotPassword, // Request password reset
+    resetPassword,  // Reset password with token
+  } = useAuth();
+
+  if (isLoading) return <Loading />;
+  if (!isAuthenticated) return <Navigate to="/login" />;
+
+  return <div>Welcome, {user?.name}!</div>;
+}
+```
+
+### Protected Routes
+
+```tsx
+import { ProtectedRoute } from "@shared/components/ProtectedRoute";
+
+// In your routes
+<Route
+  path="/"
+  element={
+    <ProtectedRoute>
+      <Dashboard />
+    </ProtectedRoute>
+  }
+/>
+```
+
+### Better Auth Client
+
+The auth client is configured in `src/shared/lib/auth-client.ts`:
+
+```tsx
+import { createAuthClient } from "better-auth/react";
+import { organizationClient, adminClient } from "better-auth/client/plugins";
+
+export const authClient = createAuthClient({
+  baseURL: import.meta.env.VITE_API_URL || "http://localhost:3000",
+  plugins: [
+    organizationClient(),
+    adminClient(),
+  ],
+});
+
+export const { signIn, signUp, signOut, useSession } = authClient;
+```
 
 ---
 
@@ -128,42 +245,49 @@ This project follows a **simplified feature-folder architecture** where each fea
 ```
 spa-api-starter/
 ├── public/                  # Static assets
+├── e2e/                     # Playwright E2E tests
+│   └── auth.spec.ts         # Authentication tests
 ├── src/
-│   ├── app/                # Application layer
-│   │   ├── hooks/          # App-level hooks
-│   │   ├── utils/          # App-level utilities
-│   │   └── views/          # Routing & layout components
-│   │       ├── AppRoutes.tsx       # Route configuration
-│   │       ├── RootLayout.tsx      # Layout wrapper
-│   │       ├── Header.tsx          # Global header
-│   │       ├── NavigationTabs.tsx  # Navigation
-│   │       └── styles/             # SCSS modules
+│   ├── app/                 # Application layer
+│   │   ├── hooks/           # App-level hooks
+│   │   ├── utils/           # App-level utilities
+│   │   └── views/           # Routing & layout components
+│   │       ├── AppRoutes.tsx        # Route configuration
+│   │       ├── RootLayout.tsx       # Layout wrapper
+│   │       └── styles/              # Global styles
 │   │
-│   ├── features/           # Feature modules (vertical slices)
-│   │   ├── Home/
-│   │   └── Products/       # Example feature (simplified structure)
-│   │       ├── hooks/
-│   │       │   └── useLoadProducts.ts  # TanStack Query hooks
-│   │       ├── views/      # UI components
-│   │       ├── productsService.ts      # API calls + transformations
-│   │       ├── productsStore.ts        # Zustand store (if needed)
-│   │       ├── types.ts                # TypeScript interfaces
-│   │       └── index.ts                # Feature exports
+│   ├── features/            # Feature modules (vertical slices)
+│   │   ├── Auth/            # Authentication feature
+│   │   │   ├── views/
+│   │   │   │   ├── LoginPage.tsx
+│   │   │   │   ├── SignupPage.tsx
+│   │   │   │   ├── VerifyEmailPage.tsx
+│   │   │   │   ├── ForgotPasswordPage.tsx
+│   │   │   │   └── SetNewPasswordPage.tsx
+│   │   │   ├── types.ts
+│   │   │   └── index.ts
+│   │   ├── Dashboard/
+│   │   └── Products/
 │   │
-│   └── shared/             # Shared utilities & components
+│   └── shared/              # Shared utilities & components
 │       ├── api/
-│       │   └── client.ts               # Axios client + config
-│       ├── components/     # Reusable UI components
-│       ├── hooks/          # Shared hooks
+│       │   └── client.ts            # Axios client (with credentials)
+│       ├── components/
+│       │   ├── ui/                  # shadcn/ui components
+│       │   └── ProtectedRoute.tsx   # Auth route guard
+│       ├── context/
+│       │   └── AuthContext.tsx      # Auth context provider
+│       ├── lib/
+│       │   └── auth-client.ts       # Better Auth React client
+│       ├── hooks/
 │       ├── store/
-│       │   └── store.ts                # Global store (optional)
-│       ├── theme/          # Theme configuration
-│       ├── types/          # Shared TypeScript types
-│       └── utils/          # Shared utilities
+│       ├── types/
+│       └── utils/
 │
-├── index.html              # HTML entry point
-├── vite.config.ts          # Vite configuration
-├── tsconfig.json           # TypeScript configuration
+├── playwright.config.ts     # Playwright configuration
+├── index.html
+├── vite.config.ts
+├── tsconfig.json
 └── package.json
 ```
 
@@ -181,8 +305,80 @@ spa-api-starter/
 
 #### `/src/shared` - Shared Layer
 - **Purpose**: Reusable code across features
-- **Contains**: API clients, utility functions, shared components
+- **Contains**: API clients, utility functions, shared components, auth context
 - **When to modify**: Adding utilities/components used by multiple features
+
+---
+
+## 🧪 E2E Testing
+
+This project uses **Playwright** for end-to-end testing with automatic server startup.
+
+### Running Tests
+
+```bash
+# Run all tests
+npx playwright test
+
+# Run tests with UI
+npx playwright test --ui
+
+# Run specific test file
+npx playwright test e2e/auth.spec.ts
+
+# Run tests in headed mode
+npx playwright test --headed
+
+# View test report
+npx playwright show-report
+```
+
+### Test Configuration
+
+The `playwright.config.ts` automatically starts both servers:
+
+```typescript
+webServer: [
+  {
+    command: 'npm run start:dev',
+    cwd: '../nestjs-api-starter',  // Backend API
+    url: 'http://localhost:3000/api/auth/ok',
+    reuseExistingServer: !process.env.CI,
+  },
+  {
+    command: 'npm run dev',         // Frontend
+    url: 'http://localhost:5173',
+    reuseExistingServer: !process.env.CI,
+  },
+],
+```
+
+### Test Coverage
+
+The E2E tests cover all authentication flows:
+
+| Test Suite | Tests |
+|------------|-------|
+| **Signup Flow** | Display, submit, navigation |
+| **Login Flow** | Display, valid login, invalid credentials, unverified email |
+| **Forgot Password** | Display, submit, navigation |
+| **Set New Password** | Invalid link, form display, validation |
+| **Email Verification** | Token handling, error states |
+| **Protected Routes** | Redirect unauthenticated users |
+| **Logout** | Session termination |
+
+### Writing New Tests
+
+```typescript
+import { test, expect } from '@playwright/test';
+
+test.describe('My Feature', () => {
+  test('should do something', async ({ page }) => {
+    await page.goto('/my-route');
+    await expect(page.getByText('Expected Text')).toBeVisible();
+  });
+});
+```
 
 ---
 
@@ -591,6 +787,11 @@ npm run build        # Build for production
 npm run preview      # Preview production build
 npm run lint         # Run ESLint
 
+# Testing
+npx playwright test           # Run E2E tests
+npx playwright test --ui      # Run with UI
+npx playwright show-report    # View test report
+
 # Type checking
 npx tsc --noEmit     # Check TypeScript types
 ```
@@ -647,13 +848,23 @@ function MyComponent() {
 
 ---
 
-## 📖 Additional Resources
+## � Related Projects
+
+- **[nestjs-api-starter](../nestjs-api-starter)** — NestJS backend API for this SPA
+- **[Better Auth](https://better-auth.com)** — Authentication library
+- **[shadcn/ui](https://ui.shadcn.com)** — UI component library
+
+---
+
+## �📖 Additional Resources
 
 - [Feature-Folder Architecture Article](https://ramonprata.medium.com/how-to-structure-a-react-app-in-2025-spa-ssr-or-native-10d8de7a245a)
+- [Better Auth Documentation](https://better-auth.com/docs)
 - [TanStack Query Documentation](https://tanstack.com/query/latest)
 - [Zustand Documentation](https://zustand-demo.pmnd.rs/)
 - [React Router Documentation](https://reactrouter.com/)
 - [Vite Documentation](https://vitejs.dev/)
+- [Playwright Documentation](https://playwright.dev/)
 
 ---
 

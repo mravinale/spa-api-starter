@@ -7,20 +7,9 @@ const createApiClient = (baseURL: string): AxiosInstance => {
         headers: {
             'Content-Type': 'application/json',
         },
+        // Use cookies for authentication (Better Auth uses httpOnly cookies)
+        withCredentials: true,
     });
-
-    // Request interceptor for auth tokens
-    instance.interceptors.request.use(
-        (config) => {
-            // Add auth token if available
-            const token = localStorage.getItem('authToken');
-            if (token) {
-                config.headers.Authorization = `Bearer ${token}`;
-            }
-            return config;
-        },
-        (error) => Promise.reject(error)
-    );
 
     // Response interceptor for error handling
     instance.interceptors.response.use(
@@ -28,8 +17,9 @@ const createApiClient = (baseURL: string): AxiosInstance => {
         (error) => {
             // Handle common errors globally
             if (error.response?.status === 401) {
-                // Handle unauthorized
+                // Handle unauthorized - redirect to login
                 console.error('Unauthorized - redirecting to login');
+                window.location.href = '/login';
             }
             return Promise.reject(error);
         }

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { useAuth } from "@shared/context/AuthContext";
@@ -23,8 +23,15 @@ export default function LoginPage() {
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [isLoading, setIsLoading] = useState(false);
-    const { login } = useAuth();
+    const { login, isAuthenticated } = useAuth();
     const navigate = useNavigate();
+
+    // Redirect if already authenticated
+    useEffect(() => {
+        if (isAuthenticated) {
+            navigate("/", { replace: true });
+        }
+    }, [isAuthenticated, navigate]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -32,7 +39,7 @@ export default function LoginPage() {
 
         try {
             await login({ email, password });
-            navigate("/");
+            // Navigation will happen via useEffect when isAuthenticated changes
         } catch (error) {
             const message = error instanceof Error ? error.message : "Login failed";
             toast.error(message);
@@ -72,12 +79,12 @@ export default function LoginPage() {
                                     <Field>
                                         <div className="flex items-center">
                                             <FieldLabel htmlFor="password">Password</FieldLabel>
-                                            <a
-                                                href="#"
+                                            <Link
+                                                to="/forgot-password"
                                                 className="ml-auto inline-block text-sm underline-offset-4 hover:underline"
                                             >
                                                 Forgot your password?
-                                            </a>
+                                            </Link>
                                         </div>
                                         <Input
                                             id="password"
