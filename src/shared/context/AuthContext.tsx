@@ -12,21 +12,31 @@ interface AuthContextType extends AuthState {
     forgotPassword: (email: string) => Promise<void>;
     resetPassword: (token: string, newPassword: string) => Promise<void>;
     sendVerificationEmail: (email: string) => Promise<void>;
+    refreshSession: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Use Better Auth's useSession hook
-    const { data: session, isPending: isLoading } = useSession();
+    const { data: session, isPending: isLoading, refetch } = useSession();
 
     const user: User | null = session?.user ? {
         id: session.user.id,
         name: session.user.name,
         email: session.user.email,
+        role: (session.user as { role?: string }).role,
+        image: session.user.image ?? undefined,
+        emailVerified: session.user.emailVerified,
+        banned: (session.user as { banned?: boolean }).banned,
+        banReason: (session.user as { banReason?: string }).banReason,
+        banExpires: (session.user as { banExpires?: Date }).banExpires,
+        createdAt: session.user.createdAt,
+        updatedAt: session.user.updatedAt,
     } : null;
 
     const isAuthenticated = !!session?.user;
+    const isAdmin = user?.role === "admin";
 
     const login = async (credentials: LoginCredentials) => {
         const result = await signIn.email({
@@ -100,11 +110,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
     };
 
+    const refreshSession = async () => {
+        await refetch();
+    };
+
     return (
         <AuthContext.Provider
             value={{
                 user,
                 isAuthenticated,
+                isAdmin,
                 isLoading,
                 login,
                 signup,
@@ -112,6 +127,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 forgotPassword,
                 resetPassword,
                 sendVerificationEmail,
+                refreshSession,
             }}
         >
             {children}

@@ -1,4 +1,3 @@
-import { Button } from "@/shared/components/ui/button"
 import { Separator } from "@/shared/components/ui/separator"
 import { SidebarTrigger } from "@/shared/components/ui/sidebar"
 import { ThemeToggle } from "@/shared/components/ui/theme-toggle"
@@ -15,15 +14,6 @@ export function SiteHeader() {
         <h1 className="text-base font-medium">Documents</h1>
         <div className="ml-auto flex items-center gap-2">
           <ThemeToggle />
-          <Button variant="ghost" asChild size="sm" className="hidden sm:flex">
-            <a
-              href="https://github.com/shadcn-ui/ui/tree/main/apps/v4/app/(examples)/dashboard"
-              rel="noopener noreferrer"
-              target="_blank"
-            >
-              GitHub
-            </a>
-          </Button>
         </div>
       </div>
     </header>

@@ -1,23 +1,16 @@
 import * as React from "react"
+import { useLocation } from "react-router-dom"
 import {
-  IconCamera,
-  IconChartBar,
+  IconBuilding,
   IconDashboard,
-  IconDatabase,
-  IconFileAi,
-  IconFileDescription,
-  IconFileWord,
-  IconFolder,
-  IconHelp,
+  IconHome,
   IconInnerShadowTop,
-  IconListDetails,
-  IconReport,
-  IconSearch,
-  IconSettings,
+  IconMail,
+  IconShield,
   IconUsers,
+  IconUserScan,
 } from "@tabler/icons-react"
 
-import { NavDocuments } from "@/shared/components/ui/nav-documents"
 import { NavMain } from "@/shared/components/ui/nav-main"
 import { NavSecondary } from "@/shared/components/ui/nav-secondary"
 import { NavUser } from "@/shared/components/ui/nav-user"
@@ -30,125 +23,79 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/shared/components/ui/sidebar"
+import { useAuth } from "@/shared/context/AuthContext"
 
-const data = {
-  user: {
-    name: "shadcn",
-    email: "m@example.com",
-    avatar: "/avatars/shadcn.jpg",
-  },
-  navMain: [
+// Navigation configuration
+const getNavItems = (isAdmin: boolean, pathname: string) => ({
+  navMain: [],
+  navGroups: [
     {
-      title: "Dashboard",
-      url: "#",
-      icon: IconDashboard,
-    },
-    {
-      title: "Lifecycle",
-      url: "#",
-      icon: IconListDetails,
-    },
-    {
-      title: "Analytics",
-      url: "#",
-      icon: IconChartBar,
-    },
-    {
-      title: "Projects",
-      url: "#",
-      icon: IconFolder,
-    },
-    {
-      title: "Team",
-      url: "#",
-      icon: IconUsers,
-    },
-  ],
-  navClouds: [
-    {
-      title: "Capture",
-      icon: IconCamera,
-      isActive: true,
-      url: "#",
+      title: "Main",
+      icon: IconHome,
+      isActive: pathname === "/",
       items: [
         {
-          title: "Active Proposals",
-          url: "#",
-        },
-        {
-          title: "Archived",
-          url: "#",
+          title: "Dashboard",
+          url: "/",
+          icon: IconDashboard,
+          isActive: pathname === "/",
         },
       ],
     },
-    {
-      title: "Proposal",
-      icon: IconFileDescription,
-      url: "#",
-      items: [
-        {
-          title: "Active Proposals",
-          url: "#",
-        },
-        {
-          title: "Archived",
-          url: "#",
-        },
-      ],
-    },
-    {
-      title: "Prompts",
-      icon: IconFileAi,
-      url: "#",
-      items: [
-        {
-          title: "Active Proposals",
-          url: "#",
-        },
-        {
-          title: "Archived",
-          url: "#",
-        },
-      ],
-    },
+    ...(isAdmin ? [
+      {
+        title: "Admin",
+        icon: IconShield,
+        isActive: pathname.startsWith("/admin") || pathname === "/invitations",
+        items: [
+          {
+            title: "My Invitations",
+            url: "/invitations",
+            icon: IconMail,
+            isActive: pathname === "/invitations",
+          },
+          {
+            title: "Users",
+            url: "/admin/users",
+            icon: IconUsers,
+            isActive: pathname.startsWith("/admin/users"),
+          },
+          {
+            title: "Sessions",
+            url: "/admin/sessions",
+            icon: IconUserScan,
+            isActive: pathname === "/admin/sessions",
+          },
+          {
+            title: "Organizations",
+            url: "/admin/organizations",
+            icon: IconBuilding,
+            isActive: pathname.startsWith("/admin/organizations"),
+          },
+          {
+            title: "Roles & Permissions",
+            url: "/admin/roles",
+            icon: IconShield,
+            isActive: pathname === "/admin/roles",
+          },
+        ],
+      },
+    ] : []),
   ],
-  navSecondary: [
-    {
-      title: "Settings",
-      url: "#",
-      icon: IconSettings,
-    },
-    {
-      title: "Get Help",
-      url: "#",
-      icon: IconHelp,
-    },
-    {
-      title: "Search",
-      url: "#",
-      icon: IconSearch,
-    },
-  ],
-  documents: [
-    {
-      name: "Data Library",
-      url: "#",
-      icon: IconDatabase,
-    },
-    {
-      name: "Reports",
-      url: "#",
-      icon: IconReport,
-    },
-    {
-      name: "Word Assistant",
-      url: "#",
-      icon: IconFileWord,
-    },
-  ],
-}
+  navSecondary: [],
+})
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+  const { user, isAdmin } = useAuth()
+  const location = useLocation()
+  const navItems = getNavItems(isAdmin, location.pathname)
+
+  const userData = {
+    name: user?.name ?? "User",
+    email: user?.email ?? "",
+    avatar: user?.image ?? "",
+  }
+
   return (
     <Sidebar collapsible="offcanvas" {...props}>
       <SidebarHeader>
@@ -158,21 +105,20 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
               asChild
               className="data-[slot=sidebar-menu-button]:!p-1.5"
             >
-              <a href="#">
+              <a href="/">
                 <IconInnerShadowTop className="!size-5" />
-                <span className="text-base font-semibold">Acme Inc.</span>
+                <span className="text-base font-semibold">Admin Panel</span>
               </a>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarHeader>
       <SidebarContent>
-        <NavMain items={data.navMain} />
-        <NavDocuments items={data.documents} />
-        <NavSecondary items={data.navSecondary} className="mt-auto" />
+        <NavMain items={navItems.navMain} groups={navItems.navGroups} />
+        <NavSecondary items={navItems.navSecondary} className="mt-auto" />
       </SidebarContent>
       <SidebarFooter>
-        <NavUser user={data.user} />
+        <NavUser user={userData} />
       </SidebarFooter>
     </Sidebar>
   )

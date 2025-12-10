@@ -9,11 +9,13 @@ import {
   SetNewPasswordPage,
 } from "@features/Auth";
 import { DashboardPage } from "@features/Dashboard";
+import { UsersPage, SessionsPage, OrganizationsPage, InvitationsPage, RolesPage } from "@features/Admin";
 import RootLayout from "./RootLayout";
 import { useInitializeApp } from "../hooks/useInitializeApp";
 import { ThemeProvider } from "@shared/components/ui";
 import { AuthProvider } from "@shared/context/AuthContext";
 import { ProtectedRoute } from "@shared/components/ProtectedRoute";
+import { AdminRoute } from "@shared/components/AdminRoute";
 import { Toaster } from "@shared/components/ui/sonner";
 
 const queryClient = new QueryClient();
@@ -44,6 +46,43 @@ const AppRoutes = () => {
                 }
               >
                 <Route index element={<DashboardPage />} />
+                
+                {/* Admin routes */}
+                <Route
+                  path="admin/users"
+                  element={
+                    <AdminRoute>
+                      <UsersPage />
+                    </AdminRoute>
+                  }
+                />
+                <Route
+                  path="admin/sessions"
+                  element={
+                    <AdminRoute>
+                      <SessionsPage />
+                    </AdminRoute>
+                  }
+                />
+                <Route
+                  path="admin/organizations"
+                  element={
+                    <AdminRoute>
+                      <OrganizationsPage />
+                    </AdminRoute>
+                  }
+                />
+                <Route
+                  path="admin/roles"
+                  element={
+                    <AdminRoute>
+                      <RolesPage />
+                    </AdminRoute>
+                  }
+                />
+                
+                {/* User invitations (accessible to all authenticated users) */}
+                <Route path="invitations" element={<InvitationsPage />} />
               </Route>
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>

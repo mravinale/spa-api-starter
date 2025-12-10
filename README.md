@@ -15,6 +15,7 @@ A modern, production-ready React Single Page Application (SPA) starter template 
 - [Architecture Overview](#-architecture-overview)
 - [Project Structure](#-project-structure)
 - [E2E Testing](#-e2e-testing)
+- [Admin Panel](#-admin-panel)
 - [Creating a New Feature](#-creating-a-new-feature)
 - [Development Guidelines](#-development-guidelines)
 - [Available Scripts](#-available-scripts)
@@ -25,11 +26,16 @@ A modern, production-ready React Single Page Application (SPA) starter template 
 
 - **Complete Authentication** — Login, signup, email verification, password reset
 - **Better Auth Integration** — Modern auth client with React hooks
+- **Admin Panel** — Full user, session, and organization management
 - **Protected Routes** — Automatic redirect for unauthenticated users
+- **Role-Based Access** — Admin-only routes and features
 - **Session Management** — Secure httpOnly cookie-based sessions
+- **Organization Management** — Create orgs, invite members, manage roles
+- **User Impersonation** — Admin can impersonate users for debugging
 - **Feature-Folder Architecture** — Scalable and maintainable structure
 - **Modern UI** — Tailwind CSS with shadcn/ui components
-- **E2E Testing** — Playwright tests for all auth flows
+- **Server-Side Pagination** — TanStack Table with server-side data fetching
+- **E2E Testing** — Playwright tests for all auth and admin flows
 - **Type Safety** — Full TypeScript support
 
 ---
@@ -379,6 +385,138 @@ test.describe('My Feature', () => {
   });
 });
 ```
+
+---
+
+## 👑 Admin Panel
+
+The Admin Panel provides comprehensive management capabilities for users, sessions, and organizations. It's only accessible to users with the `admin` role.
+
+### Admin Routes
+
+| Route | Component | Description |
+|-------|-----------|-------------|
+| `/admin/users` | `UsersPage` | User management (CRUD, ban/unban, roles) |
+| `/admin/sessions` | `SessionsPage` | View and revoke user sessions |
+| `/admin/organizations` | `OrganizationsPage` | Organization management |
+
+### Features
+
+#### User Management
+- **List Users** — Server-side paginated table with search
+- **Create User** — Add new users with role assignment
+- **Edit User** — Change roles, reset passwords
+- **Ban/Unban** — Temporarily or permanently ban users
+- **Delete User** — Remove users from the system
+- **Impersonate** — Login as another user for debugging
+
+#### Session Management
+- **View Sessions** — See all active sessions per user
+- **Revoke Session** — End specific sessions
+- **Revoke All** — End all sessions for a user
+
+#### Organization Management
+- **Create Organization** — Set up new organizations with slug
+- **Edit Organization** — Update name and settings
+- **Delete Organization** — Remove organizations
+- **Invite Members** — Send email invitations
+- **Manage Roles** — Assign owner/admin/member roles
+- **Cancel Invitations** — Revoke pending invites
+
+### Using Admin Features
+
+#### AdminRoute Component
+
+```tsx
+import { AdminRoute } from "@shared/components/AdminRoute";
+
+// Protect admin-only routes
+<Route
+  path="admin/users"
+  element={
+    <AdminRoute>
+      <UsersPage />
+    </AdminRoute>
+  }
+/>
+```
+
+#### Check Admin Status
+
+```tsx
+import { useAuth } from "@shared/context/AuthContext";
+
+function MyComponent() {
+  const { isAdmin, user } = useAuth();
+
+  if (!isAdmin) {
+    return <div>Access Denied</div>;
+  }
+
+  return <div>Welcome, Admin {user?.name}!</div>;
+}
+```
+
+#### Admin Service
+
+```tsx
+import { adminService, organizationService } from "@features/Admin";
+
+// User operations
+const users = await adminService.listUsers({ limit: 10, offset: 0 });
+await adminService.banUser({ userId: "123", banReason: "Spam" });
+await adminService.setRole({ userId: "123", role: "admin" });
+
+// Organization operations
+const orgs = await organizationService.listOrganizations();
+await organizationService.inviteMember({
+  organizationId: "org-123",
+  email: "user@example.com",
+  role: "member",
+});
+```
+
+#### Admin Hooks
+
+```tsx
+import {
+  useUsers,
+  useCreateUser,
+  useBanUser,
+  useSetUserRole,
+} from "@features/Admin";
+
+function UsersManager() {
+  const { data, isLoading } = useUsers({ limit: 10 });
+  const createUser = useCreateUser();
+  const banUser = useBanUser();
+
+  const handleBan = async (userId: string) => {
+    await banUser.mutateAsync({ userId, banReason: "Violation" });
+  };
+
+  return (
+    <div>
+      {data?.data.map(user => (
+        <UserRow key={user.id} user={user} onBan={handleBan} />
+      ))}
+    </div>
+  );
+}
+```
+
+### Setting Up Admin User
+
+To create an admin user, you need to:
+
+1. Create a regular user via signup
+2. Update the user's role in the database:
+
+```sql
+UPDATE "user" SET role = 'admin' WHERE email = 'admin@example.com';
+```
+
+Or use the Better Auth admin API from the backend.
 
 ---
 

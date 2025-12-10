@@ -1,10 +1,10 @@
 import {
-  IconCreditCard,
   IconDotsVertical,
   IconLogout,
-  IconNotification,
+  IconSettings,
   IconUserCircle,
 } from "@tabler/icons-react"
+import { Link } from "react-router-dom"
 import { useNavigate } from "react-router-dom"
 
 import {
@@ -95,13 +95,11 @@ export function NavUser({
                 <IconUserCircle />
                 Account
               </DropdownMenuItem>
-              <DropdownMenuItem>
-                <IconCreditCard />
-                Billing
-              </DropdownMenuItem>
-              <DropdownMenuItem>
-                <IconNotification />
-                Notifications
+              <DropdownMenuItem asChild>
+                <Link to="/settings">
+                  <IconSettings />
+                  Settings
+                </Link>
               </DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
