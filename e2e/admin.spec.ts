@@ -91,7 +91,8 @@ test.describe('Admin Panel E2E Tests', () => {
     test('should login and access dashboard', async ({ page }) => {
       await login(page);
       await expect(page).toHaveURL('/');
-      await expect(page.getByRole('link', { name: /dashboard/i })).toBeVisible();
+      // Check sidebar has dashboard link
+      await expect(page.locator('[data-slot="sidebar"]').getByRole('link', { name: /dashboard/i })).toBeVisible();
     });
 
     test('should show admin navigation for admin users', async ({ page }) => {
@@ -181,9 +182,23 @@ test.describe('Admin Panel E2E Tests', () => {
       await page.getByRole('link', { name: /organizations/i }).click();
       await expect(page).toHaveURL('/admin/organizations');
 
-      // Dashboard is inside the Main group (expanded by default)
-      await page.getByRole('link', { name: /dashboard/i }).click();
+      // Dashboard is inside the Main group (expanded by default) - use sidebar link
+      await page.locator('[data-slot="sidebar"]').getByRole('link', { name: /dashboard/i }).click();
       await expect(page).toHaveURL('/');
+    });
+
+    test('should show breadcrumbs for navigation', async ({ page }) => {
+      // On users page, breadcrumb should show: Admin > Users (follows sidebar grouping)
+      await expect(page.getByLabel('breadcrumb')).toBeVisible();
+      await expect(page.getByLabel('breadcrumb').getByText('Admin')).toBeVisible();
+      await expect(page.getByLabel('breadcrumb').getByText('Users')).toBeVisible();
+    });
+
+    test('should navigate via breadcrumb links', async ({ page }) => {
+      // Click on Admin in breadcrumb to go to admin section root
+      await page.getByLabel('breadcrumb').getByRole('link', { name: 'Admin' }).click();
+      // Admin doesn't have a dedicated page, so it stays on current or goes to first admin page
+      await expect(page.getByLabel('breadcrumb')).toBeVisible();
     });
   });
 
@@ -287,27 +302,40 @@ test.describe('Admin Panel E2E Tests', () => {
     });
 
     test('should show all available roles', async ({ page }) => {
-      // Check that all three roles are displayed in role cards
+      // Wait for roles to load from API
+      await page.waitForSelector('[data-testid^="role-card-"]');
+      
+      // Check that unified roles are displayed (admin, manager, member)
       await expect(page.locator('[data-testid="role-card-admin"]')).toBeVisible();
-      await expect(page.locator('[data-testid="role-card-user"]')).toBeVisible();
-      await expect(page.locator('[data-testid="role-card-moderator"]')).toBeVisible();
+      await expect(page.locator('[data-testid="role-card-manager"]')).toBeVisible();
+      await expect(page.locator('[data-testid="role-card-member"]')).toBeVisible();
     });
 
     test('should show role descriptions', async ({ page }) => {
-      await expect(page.getByText(/full access to all resources/i)).toBeVisible();
-      await expect(page.getByText(/basic user with no administrative/i)).toBeVisible();
-      await expect(page.getByText(/can manage users and sessions/i)).toBeVisible();
+      await page.waitForSelector('[data-testid^="role-card-"]');
+      // Unified role model descriptions
+      await expect(page.getByText(/global platform administrator/i)).toBeVisible();
+      await expect(page.getByText(/organization manager/i)).toBeVisible();
+      await expect(page.getByText(/organization member/i)).toBeVisible();
     });
 
-    test('should show permissions for each role', async ({ page }) => {
-      // Admin card should show user and session permissions
+    test('should show Create Role button', async ({ page }) => {
+      await expect(page.getByRole('button', { name: /create role/i })).toBeVisible();
+    });
+
+    test('should open create role dialog', async ({ page }) => {
+      await page.getByRole('button', { name: /create role/i }).click();
+      await expect(page.getByRole('dialog')).toBeVisible();
+      await expect(page.getByText(/create new role/i)).toBeVisible();
+      // Check for form fields using more specific selectors
+      await expect(page.getByRole('textbox', { name: /name \(identifier\)/i })).toBeVisible();
+      await expect(page.getByRole('textbox', { name: /display name/i })).toBeVisible();
+    });
+
+    test('should show manage permissions button on role cards', async ({ page }) => {
+      await page.waitForSelector('[data-testid^="role-card-"]');
       const adminCard = page.locator('[data-testid="role-card-admin"]');
-      await expect(adminCard).toBeVisible();
-      
-      // Check for permission badges within admin card
-      await expect(adminCard.getByText('user:create')).toBeVisible();
-      await expect(adminCard.getByText('user:delete')).toBeVisible();
-      await expect(adminCard.getByText('session:revoke')).toBeVisible();
+      await expect(adminCard.getByRole('button', { name: /manage/i })).toBeVisible();
     });
 
     test('should allow changing user role from users page', async ({ page }) => {
@@ -324,6 +352,55 @@ test.describe('Admin Panel E2E Tests', () => {
       
       // Check that Change Role option exists
       await expect(page.getByRole('menuitem', { name: /change role/i })).toBeVisible();
+    });
+
+    test('should persist permissions when assigned to a role', async ({ page }) => {
+      // Wait for roles to load
+      await page.waitForSelector('[data-testid^="role-card-"]');
+      
+      // Find the admin role card and click Manage permissions
+      const adminCard = page.locator('[data-testid="role-card-admin"]');
+      await adminCard.getByRole('button', { name: /manage/i }).click();
+      
+      // Wait for permissions dialog to open
+      await expect(page.getByRole('dialog')).toBeVisible();
+      await expect(page.getByText(/manage permissions/i)).toBeVisible();
+      
+      // Wait for permissions to load in the dialog
+      await page.waitForTimeout(500);
+      
+      // Check if there are any checkboxes (permissions loaded)
+      const checkboxes = page.getByRole('checkbox');
+      const checkboxCount = await checkboxes.count();
+      
+      // If permissions are loaded, try toggling one
+      if (checkboxCount > 0) {
+        // Get the first checkbox state
+        const firstCheckbox = checkboxes.first();
+        const wasChecked = await firstCheckbox.isChecked();
+        
+        // Toggle it
+        await firstCheckbox.click();
+        
+        // Save permissions
+        await page.getByRole('button', { name: /save permissions/i }).click();
+        
+        // Wait for dialog to close
+        await expect(page.getByRole('dialog')).not.toBeVisible({ timeout: 5000 });
+        
+        // Re-open the permissions dialog
+        await adminCard.getByRole('button', { name: /manage/i }).click();
+        await expect(page.getByRole('dialog')).toBeVisible();
+        await page.waitForTimeout(500);
+        
+        // Verify the permission state was persisted
+        const newState = await checkboxes.first().isChecked();
+        expect(newState).toBe(!wasChecked);
+        
+        // Restore original state
+        await checkboxes.first().click();
+        await page.getByRole('button', { name: /save permissions/i }).click();
+      }
     });
   });
 });

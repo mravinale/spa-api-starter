@@ -4,6 +4,7 @@ import { toast } from "sonner"
 import { Button } from "@/shared/components/ui/button"
 import { useStopImpersonating } from "@/features/Admin/hooks/useUsers"
 import { useAuth } from "@/shared/context/AuthContext"
+import { useIsImpersonating } from "@/shared/hooks/useIsImpersonating"
 
 /**
  * Banner displayed when an admin is impersonating another user.
@@ -12,10 +13,7 @@ import { useAuth } from "@/shared/context/AuthContext"
 export function ImpersonationBanner() {
   const { user, refreshSession } = useAuth()
   const stopImpersonating = useStopImpersonating()
-
-  // Check if currently impersonating (Better Auth sets impersonatedBy on session)
-  // For now, we'll use a simple check - in production, you'd check session.impersonatedBy
-  const isImpersonating = false // This would come from session data
+  const { isImpersonating } = useIsImpersonating()
 
   const handleStopImpersonating = async () => {
     try {

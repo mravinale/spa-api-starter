@@ -1,56 +1,43 @@
-# 🚀 React SPA API Starter with Better Auth
+# React SPA Starter
 
-A modern, production-ready React Single Page Application (SPA) starter template built with **Vite**, **TypeScript**, **Better Auth**, and a **feature-folder architecture**. This project demonstrates best practices for scalable frontend applications with complete authentication.
+A production-ready **React SPA** with **Better Auth**, **RBAC**, **Admin Panel**, and **Organization Management**.
 
-> 📖 **Based on:** [How to structure a React App in 2025 (SPA, SSR or Native)](https://ramonprata.medium.com/how-to-structure-a-react-app-in-2025-spa-ssr-or-native-10d8de7a245a)
+## Table of Contents
 
----
-
-## 📋 Table of Contents
-
-- [Features](#-features)
-- [Quick Start](#-quick-start)
-- [Technology Stack](#-technology-stack)
-- [Authentication](#-authentication)
-- [Architecture Overview](#-architecture-overview)
-- [Project Structure](#-project-structure)
-- [E2E Testing](#-e2e-testing)
-- [Admin Panel](#-admin-panel)
-- [Creating a New Feature](#-creating-a-new-feature)
-- [Development Guidelines](#-development-guidelines)
-- [Available Scripts](#-available-scripts)
+- [Features](#features)
+- [Quick Start](#quick-start)
+- [Project Structure](#project-structure)
+- [Unified Role Model](#unified-role-model)
+- [Admin Panel](#admin-panel)
+- [Authentication](#authentication)
+- [E2E Testing](#e2e-testing)
+- [Development](#development)
+- [Companion Backend](#companion-backend)
 
 ---
 
-## ✨ Features
+## Features
 
-- **Complete Authentication** — Login, signup, email verification, password reset
-- **Better Auth Integration** — Modern auth client with React hooks
-- **Admin Panel** — Full user, session, and organization management
-- **Protected Routes** — Automatic redirect for unauthenticated users
-- **Role-Based Access** — Admin-only routes and features
-- **Session Management** — Secure httpOnly cookie-based sessions
-- **Organization Management** — Create orgs, invite members, manage roles
-- **User Impersonation** — Admin can impersonate users for debugging
-- **Feature-Folder Architecture** — Scalable and maintainable structure
-- **Modern UI** — Tailwind CSS with shadcn/ui components
-- **Server-Side Pagination** — TanStack Table with server-side data fetching
-- **E2E Testing** — Playwright tests for all auth and admin flows
-- **Type Safety** — Full TypeScript support
+| Category | Features |
+|----------|----------|
+| **Authentication** | Login, signup, email verification, password reset |
+| **Authorization** | Unified 3-role model (Admin, Manager, Member), role-based navigation |
+| **Admin Panel** | Users, Sessions, Organizations, Roles & Permissions management |
+| **Organizations** | Create orgs, invite members, manage roles, impersonation |
+| **UI** | Tailwind CSS, shadcn/ui, responsive sidebar, dark mode |
+| **Testing** | 123 Playwright E2E tests with full coverage |
 
 ---
 
-## 🏃 Quick Start
+## Quick Start
 
 ### Prerequisites
 
-- **Node.js** >= 18.x
-- **npm** >= 9.x (or **yarn** / **pnpm**)
+- **Node.js** >= 20.x
+- **npm** >= 10.x
 - **Backend API** — [nestjs-api-starter](../nestjs-api-starter) running on port 3000
 
-### 1. Start the Backend API
-
-First, ensure the backend API is running:
+### 1. Start Backend
 
 ```bash
 cd ../nestjs-api-starter
@@ -58,954 +45,336 @@ npm install
 npm run start:dev
 ```
 
-### 2. Install and Run Frontend
+### 2. Start Frontend
 
 ```bash
-# Clone the repository
-git clone <your-repo-url>
 cd spa-api-starter
-
-# Install dependencies
 npm install
-
-# Start development server
 npm run dev
 ```
 
-The application will be available at **http://localhost:5173**
+Open **http://localhost:5173**
 
-### 3. Configure Environment (Optional)
+### 3. Login
 
-Create a `.env` file if you need to customize the API URL:
+Use the test admin account: `test@example.com` / `password123`
 
-```env
-VITE_API_URL=http://localhost:3000
+---
+
+## Project Structure
+
 ```
-
-### Build for Production
-
-```bash
-# Type-check and build
-npm run build
-
-# Preview production build
-npm run preview
+src/
+├── app/                       # Application layer
+│   └── views/
+│       ├── AppRoutes.tsx      # Route configuration
+│       └── RootLayout.tsx     # Layout with sidebar
+│
+├── features/                  # Feature modules
+│   ├── Admin/                 # Admin panel
+│   │   ├── views/
+│   │   │   ├── UsersPage.tsx
+│   │   │   ├── SessionsPage.tsx
+│   │   │   ├── OrganizationsPage.tsx
+│   │   │   └── RolesPage.tsx
+│   │   ├── services/          # API services
+│   │   └── hooks/             # React Query hooks
+│   │
+│   ├── Auth/                  # Authentication
+│   │   └── views/
+│   │       ├── LoginPage.tsx
+│   │       ├── SignupPage.tsx
+│   │       ├── ForgotPasswordPage.tsx
+│   │       └── VerifyEmailPage.tsx
+│   │
+│   └── Dashboard/             # Dashboard
+│
+├── shared/                    # Shared code
+│   ├── components/
+│   │   ├── ui/                # shadcn/ui components
+│   │   ├── AdminRoute.tsx     # Admin route guard
+│   │   └── ProtectedRoute.tsx # Auth route guard
+│   ├── context/
+│   │   └── AuthContext.tsx    # Auth provider
+│   ├── hooks/
+│   │   ├── useOrgRole.ts      # Organization role hook
+│   │   └── useIsImpersonating.ts
+│   └── lib/
+│       └── auth-client.ts     # Better Auth client
+│
+└── e2e/                       # Playwright tests
+    ├── auth.spec.ts
+    ├── admin.spec.ts
+    ├── rbac-unified-roles.spec.ts
+    └── full-coverage.spec.ts
 ```
 
 ---
 
-## 🛠️ Technology Stack
+## Unified Role Model
 
-| Technology | Version | Purpose |
-|-----------|---------|---------|
-| **React** | 19.x | UI framework |
-| **TypeScript** | 5.x | Type safety |
-| **Vite** | 7.x | Build tool & dev server |
-| **Better Auth** | 1.x | Authentication client |
-| **React Router** | 7.x | Client-side routing |
-| **TanStack Query** | 5.x | Server state management |
-| **Zustand** | 5.x | Client state management |
-| **Tailwind CSS** | 4.x | Styling |
-| **shadcn/ui** | - | UI components |
-| **Playwright** | 1.x | E2E testing |
+The frontend enforces the same **3-role model** as the backend:
 
-### Dev Dependencies
+| Role | Access | Navigation |
+|------|--------|------------|
+| **Admin** | Full platform access | Users, Sessions, Organizations, Roles & Permissions |
+| **Manager** | Organization-scoped | Dashboard, Invitations (no admin panel) |
+| **Member** | Basic read access | Dashboard, Invitations (no admin panel) |
 
-- **ESLint** — Code linting with TypeScript support
-- **Playwright** — End-to-end testing
-- **vite-tsconfig-paths** — TypeScript path aliases in Vite
+### Role-Based Navigation
+
+The sidebar automatically shows/hides items based on user role:
+
+```tsx
+// Admin sees:
+- Dashboard
+- My Invitations
+- Admin
+  - Users
+  - Sessions
+  - Organizations
+  - Roles & Permissions
+
+// Manager/Member sees:
+- Dashboard
+- My Invitations
+```
+
+### Route Protection
+
+**AdminRoute** - Only allows `admin` role:
+```tsx
+<Route path="admin/users" element={<AdminRoute><UsersPage /></AdminRoute>} />
+```
+
+**ProtectedRoute** - Requires authentication:
+```tsx
+<Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+```
+
+### Checking Roles
+
+```tsx
+import { useAuth } from "@shared/context/AuthContext";
+
+function MyComponent() {
+  const { user, isAdmin } = useAuth();
+  
+  if (isAdmin) {
+    // Show admin features
+  }
+  
+  // user.role is 'admin' | 'manager' | 'member'
+}
+```
 
 ---
 
-## 🔐 Authentication
+## Admin Panel
 
-### Authentication Flow
+### Pages
 
-```
-┌──────────┐     ┌──────────┐     ┌──────────┐     ┌──────────┐
-│  Signup  │────▶│  Email   │────▶│  Verify  │────▶│  Login   │
-│  /signup │     │  Sent    │     │  /verify │     │  /login  │
-└──────────┘     └──────────┘     └──────────┘     └──────────┘
-                                                         │
-                                                         ▼
-┌──────────┐     ┌──────────┐     ┌──────────┐     ┌──────────┐
-│  Forgot  │────▶│  Reset   │────▶│  Set New │────▶│Dashboard │
-│ /forgot  │     │  Email   │     │ /set-new │     │    /     │
-└──────────┘     └──────────┘     └──────────┘     └──────────┘
-```
+| Route | Page | Features |
+|-------|------|----------|
+| `/admin/users` | Users | List, create, edit, ban/unban, change role, impersonate |
+| `/admin/sessions` | Sessions | View sessions, revoke single/all |
+| `/admin/organizations` | Organizations | Create, edit, delete, manage members, invite |
+| `/admin/roles` | Roles & Permissions | View roles, manage permissions |
+
+### Users Page
+
+- Server-side paginated table with search
+- Actions: Edit, Ban/Unban, Change Role, Impersonate, Delete
+- Create new users with role assignment
+
+### Organizations Page
+
+- List all organizations
+- Create/Edit/Delete organizations
+- Manage members (add, remove, change role)
+- Send invitations
+- Cancel pending invitations
+
+### Roles & Permissions Page
+
+- View all roles (Admin, Manager, Member)
+- See permissions assigned to each role
+- Manage permission assignments
+- Create custom roles
+
+---
+
+## Authentication
 
 ### Auth Routes
 
-| Route | Component | Description |
-|-------|-----------|-------------|
-| `/login` | `LoginPage` | User login |
-| `/signup` | `SignupPage` | User registration |
-| `/verify-email` | `VerifyEmailPage` | Email verification |
-| `/forgot-password` | `ForgotPasswordPage` | Request password reset |
-| `/set-new-password` | `SetNewPasswordPage` | Set new password |
+| Route | Description |
+|-------|-------------|
+| `/login` | Login page |
+| `/signup` | Registration |
+| `/forgot-password` | Request password reset |
+| `/set-new-password` | Reset password with token |
+| `/verify-email` | Email verification |
 
-### Using Authentication
+### Using Auth Context
 
 ```tsx
 import { useAuth } from "@shared/context/AuthContext";
 
 function MyComponent() {
   const { 
-    user,           // Current user or null
-    isAuthenticated,// Boolean
-    isLoading,      // Loading state
-    login,          // Login function
-    signup,         // Signup function
-    logout,         // Logout function
-    forgotPassword, // Request password reset
-    resetPassword,  // Reset password with token
+    user,            // Current user
+    isAuthenticated, // Boolean
+    isAdmin,         // Boolean
+    isLoading,       // Loading state
+    login,           // (email, password) => Promise
+    logout,          // () => Promise
   } = useAuth();
-
-  if (isLoading) return <Loading />;
-  if (!isAuthenticated) return <Navigate to="/login" />;
-
-  return <div>Welcome, {user?.name}!</div>;
 }
 ```
 
-### Protected Routes
+### Better Auth Client
 
 ```tsx
-import { ProtectedRoute } from "@shared/components/ProtectedRoute";
+import { authClient } from "@shared/lib/auth-client";
 
-// In your routes
+// Direct API calls
+await authClient.signIn.email({ email, password });
+await authClient.signUp.email({ email, password, name });
+await authClient.signOut();
+```
+
+---
+
+## E2E Testing
+
+### Test Files (123 tests total)
+
+| File | Tests | Coverage |
+|------|-------|----------|
+| `auth.spec.ts` | 17 | Authentication flows |
+| `admin.spec.ts` | 24 | Admin panel navigation |
+| `rbac-unified-roles.spec.ts` | 36 | Role-based access control |
+| `full-coverage.spec.ts` | 36 | CRUD operations |
+| `rbac-impersonation.spec.ts` | 10 | Impersonation UI |
+
+### Running Tests
+
+```bash
+# All tests (headless)
+npm run test:e2e
+
+# Watch tests run (headed)
+npm run test:e2e:headed
+
+# Interactive UI
+npm run test:e2e:ui
+
+# View report
+npx playwright show-report
+```
+
+### Test Coverage
+
+**Role-Based Access:**
+- ✅ Admin can access all admin pages
+- ✅ Manager cannot access admin pages
+- ✅ Member cannot access admin pages
+- ✅ Direct URL access is blocked for non-admins
+
+**CRUD Operations:**
+- ✅ Create/Edit/Delete users
+- ✅ Ban/Unban users
+- ✅ Create/Edit/Delete organizations
+- ✅ Add/Remove organization members
+- ✅ Create/Delete roles
+- ✅ Manage permissions
+
+**API Protection:**
+- ✅ Unauthenticated requests rejected (401/403)
+
+---
+
+## Development
+
+### Scripts
+
+```bash
+npm run dev           # Start dev server
+npm run build         # Build for production
+npm run preview       # Preview production build
+npm run lint          # ESLint
+npm run test:e2e      # Run Playwright tests
+```
+
+### Adding Admin Features
+
+1. Create page in `src/features/Admin/views/`
+2. Add service in `src/features/Admin/services/`
+3. Add hooks in `src/features/Admin/hooks/`
+4. Add route in `src/app/views/AppRoutes.tsx` with `AdminRoute`
+5. Add navigation item in sidebar
+
+### Adding Protected Routes
+
+```tsx
+// In AppRoutes.tsx
 <Route
-  path="/"
+  path="my-feature"
   element={
     <ProtectedRoute>
-      <Dashboard />
+      <MyFeaturePage />
     </ProtectedRoute>
   }
 />
 ```
 
-### Better Auth Client
-
-The auth client is configured in `src/shared/lib/auth-client.ts`:
-
-```tsx
-import { createAuthClient } from "better-auth/react";
-import { organizationClient, adminClient } from "better-auth/client/plugins";
-
-export const authClient = createAuthClient({
-  baseURL: import.meta.env.VITE_API_URL || "http://localhost:3000",
-  plugins: [
-    organizationClient(),
-    adminClient(),
-  ],
-});
-
-export const { signIn, signUp, signOut, useSession } = authClient;
-```
-
 ---
 
-## 🏗️ Architecture Overview
+## Companion Backend
 
-This project follows a **simplified feature-folder architecture** where each feature is self-contained with its own components, logic, and state - without excessive abstraction layers.
+This SPA works with **[nestjs-api-starter](../nestjs-api-starter)**:
 
-### Core Principles
-
-1. **Feature Independence** - Features are loosely coupled and highly cohesive
-2. **Pragmatic Simplification** - No unnecessary abstractions
-3. **Type Safety** - Strict TypeScript throughout
-4. **Scalability** - Easy to add new features without affecting existing ones
-
-### Data Flow (Simplified)
-
-```
-┌─────────────────┐
-│  UI Component   │ ← Presentation Layer
-└────────┬────────┘
-         │ (React Query Hook)
-         ▼
-┌─────────────────┐
-│ ProductsService │ ← Service Layer (API calls + transformations)
-└────────┬────────┘
-         │
-         ▼
-┌─────────────────┐
-│   Axios Client  │ ← Network Layer
-└────────┬────────┘
-         │
-         ▼
-┌─────────────────┐
-│   Backend API   │
-└─────────────────┘
-```
-
-### State Management Strategy
-
-- **Server State** (TanStack Query): API data, caching, background updates
-- **Client State** (Zustand): UI state, user preferences - direct stores per feature
-
----
-
-## 📁 Project Structure
-
-```
-spa-api-starter/
-├── public/                  # Static assets
-├── e2e/                     # Playwright E2E tests
-│   └── auth.spec.ts         # Authentication tests
-├── src/
-│   ├── app/                 # Application layer
-│   │   ├── hooks/           # App-level hooks
-│   │   ├── utils/           # App-level utilities
-│   │   └── views/           # Routing & layout components
-│   │       ├── AppRoutes.tsx        # Route configuration
-│   │       ├── RootLayout.tsx       # Layout wrapper
-│   │       └── styles/              # Global styles
-│   │
-│   ├── features/            # Feature modules (vertical slices)
-│   │   ├── Auth/            # Authentication feature
-│   │   │   ├── views/
-│   │   │   │   ├── LoginPage.tsx
-│   │   │   │   ├── SignupPage.tsx
-│   │   │   │   ├── VerifyEmailPage.tsx
-│   │   │   │   ├── ForgotPasswordPage.tsx
-│   │   │   │   └── SetNewPasswordPage.tsx
-│   │   │   ├── types.ts
-│   │   │   └── index.ts
-│   │   ├── Dashboard/
-│   │   └── Products/
-│   │
-│   └── shared/              # Shared utilities & components
-│       ├── api/
-│       │   └── client.ts            # Axios client (with credentials)
-│       ├── components/
-│       │   ├── ui/                  # shadcn/ui components
-│       │   └── ProtectedRoute.tsx   # Auth route guard
-│       ├── context/
-│       │   └── AuthContext.tsx      # Auth context provider
-│       ├── lib/
-│       │   └── auth-client.ts       # Better Auth React client
-│       ├── hooks/
-│       ├── store/
-│       ├── types/
-│       └── utils/
-│
-├── playwright.config.ts     # Playwright configuration
-├── index.html
-├── vite.config.ts
-├── tsconfig.json
-└── package.json
-```
-
-### Key Directories Explained
-
-#### `/src/app` - Application Layer
-- **Purpose**: Application-wide concerns (routing, layouts, initialization)
-- **Contains**: Routes, layouts, navigation, app-level hooks
-- **When to modify**: Adding new routes, changing global layout
-
-#### `/src/features` - Feature Modules
-- **Purpose**: Self-contained feature implementations
-- **Contains**: Feature-specific UI, business logic, state, types
-- **When to modify**: Adding/modifying features
-
-#### `/src/shared` - Shared Layer
-- **Purpose**: Reusable code across features
-- **Contains**: API clients, utility functions, shared components, auth context
-- **When to modify**: Adding utilities/components used by multiple features
-
----
-
-## 🧪 E2E Testing
-
-This project uses **Playwright** for end-to-end testing with automatic server startup.
-
-### Running Tests
+### Running Together
 
 ```bash
-# Run all tests
-npx playwright test
+# Terminal 1: Backend (port 3000)
+cd nestjs-api-starter
+npm run start:dev
 
-# Run tests with UI
-npx playwright test --ui
-
-# Run specific test file
-npx playwright test e2e/auth.spec.ts
-
-# Run tests in headed mode
-npx playwright test --headed
-
-# View test report
-npx playwright show-report
+# Terminal 2: Frontend (port 5173)
+cd spa-api-starter
+npm run dev
 ```
 
-### Test Configuration
+### API Configuration
 
-The `playwright.config.ts` automatically starts both servers:
+Default API URL: `http://localhost:3000`
 
-```typescript
-webServer: [
-  {
-    command: 'npm run start:dev',
-    cwd: '../nestjs-api-starter',  // Backend API
-    url: 'http://localhost:3000/api/auth/ok',
-    reuseExistingServer: !process.env.CI,
-  },
-  {
-    command: 'npm run dev',         // Frontend
-    url: 'http://localhost:5173',
-    reuseExistingServer: !process.env.CI,
-  },
-],
-```
-
-### Test Coverage
-
-The E2E tests cover all authentication flows:
-
-| Test Suite | Tests |
-|------------|-------|
-| **Signup Flow** | Display, submit, navigation |
-| **Login Flow** | Display, valid login, invalid credentials, unverified email |
-| **Forgot Password** | Display, submit, navigation |
-| **Set New Password** | Invalid link, form display, validation |
-| **Email Verification** | Token handling, error states |
-| **Protected Routes** | Redirect unauthenticated users |
-| **Logout** | Session termination |
-
-### Writing New Tests
-
-```typescript
-import { test, expect } from '@playwright/test';
-
-test.describe('My Feature', () => {
-  test('should do something', async ({ page }) => {
-    await page.goto('/my-route');
-    await expect(page.getByText('Expected Text')).toBeVisible();
-  });
-});
+To customize, create `.env`:
+```env
+VITE_API_URL=http://localhost:3000
 ```
 
 ---
 
-## 👑 Admin Panel
+## Technology Stack
 
-The Admin Panel provides comprehensive management capabilities for users, sessions, and organizations. It's only accessible to users with the `admin` role.
-
-### Admin Routes
-
-| Route | Component | Description |
-|-------|-----------|-------------|
-| `/admin/users` | `UsersPage` | User management (CRUD, ban/unban, roles) |
-| `/admin/sessions` | `SessionsPage` | View and revoke user sessions |
-| `/admin/organizations` | `OrganizationsPage` | Organization management |
-
-### Features
-
-#### User Management
-- **List Users** — Server-side paginated table with search
-- **Create User** — Add new users with role assignment
-- **Edit User** — Change roles, reset passwords
-- **Ban/Unban** — Temporarily or permanently ban users
-- **Delete User** — Remove users from the system
-- **Impersonate** — Login as another user for debugging
-
-#### Session Management
-- **View Sessions** — See all active sessions per user
-- **Revoke Session** — End specific sessions
-- **Revoke All** — End all sessions for a user
-
-#### Organization Management
-- **Create Organization** — Set up new organizations with slug
-- **Edit Organization** — Update name and settings
-- **Delete Organization** — Remove organizations
-- **Invite Members** — Send email invitations
-- **Manage Roles** — Assign owner/admin/member roles
-- **Cancel Invitations** — Revoke pending invites
-
-### Using Admin Features
-
-#### AdminRoute Component
-
-```tsx
-import { AdminRoute } from "@shared/components/AdminRoute";
-
-// Protect admin-only routes
-<Route
-  path="admin/users"
-  element={
-    <AdminRoute>
-      <UsersPage />
-    </AdminRoute>
-  }
-/>
-```
-
-#### Check Admin Status
-
-```tsx
-import { useAuth } from "@shared/context/AuthContext";
-
-function MyComponent() {
-  const { isAdmin, user } = useAuth();
-
-  if (!isAdmin) {
-    return <div>Access Denied</div>;
-  }
-
-  return <div>Welcome, Admin {user?.name}!</div>;
-}
-```
-
-#### Admin Service
-
-```tsx
-import { adminService, organizationService } from "@features/Admin";
-
-// User operations
-const users = await adminService.listUsers({ limit: 10, offset: 0 });
-await adminService.banUser({ userId: "123", banReason: "Spam" });
-await adminService.setRole({ userId: "123", role: "admin" });
-
-// Organization operations
-const orgs = await organizationService.listOrganizations();
-await organizationService.inviteMember({
-  organizationId: "org-123",
-  email: "user@example.com",
-  role: "member",
-});
-```
-
-#### Admin Hooks
-
-```tsx
-import {
-  useUsers,
-  useCreateUser,
-  useBanUser,
-  useSetUserRole,
-} from "@features/Admin";
-
-function UsersManager() {
-  const { data, isLoading } = useUsers({ limit: 10 });
-  const createUser = useCreateUser();
-  const banUser = useBanUser();
-
-  const handleBan = async (userId: string) => {
-    await banUser.mutateAsync({ userId, banReason: "Violation" });
-  };
-
-  return (
-    <div>
-      {data?.data.map(user => (
-        <UserRow key={user.id} user={user} onBan={handleBan} />
-      ))}
-    </div>
-  );
-}
-```
-
-### Setting Up Admin User
-
-To create an admin user, you need to:
-
-1. Create a regular user via signup
-2. Update the user's role in the database:
-
-```sql
-UPDATE "user" SET role = 'admin' WHERE email = 'admin@example.com';
-```
-
-Or use the Better Auth admin API from the backend.
+| Technology | Version | Purpose |
+|------------|---------|---------|
+| React | 19.x | UI framework |
+| TypeScript | 5.x | Type safety |
+| Vite | 7.x | Build tool |
+| Better Auth | 1.4.x | Auth client |
+| React Router | 7.x | Routing |
+| TanStack Query | 5.x | Server state |
+| Tailwind CSS | 4.x | Styling |
+| shadcn/ui | - | UI components |
+| Playwright | 1.x | E2E testing |
 
 ---
 
-## 🎯 Creating a New Feature
-
-Follow this step-by-step guide to create a new feature. We'll use **"Todo"** as an example.
-
-### Step 1: Create Feature Folder Structure
-
-```bash
-mkdir -p src/features/Todo/{views,hooks,services,store,types,utils}
-```
-
-Your structure should look like:
-```
-src/features/Todo/
-├── views/
-├── hooks/
-├── services/
-├── store/
-├── types/
-├── utils/
-└── index.ts
-```
-
-### Step 2: Define TypeScript Types
-
-Create `src/features/Todo/types/ITodo.ts`:
-
-```typescript
-// Data Transfer Object (from API)
-export interface ITodoDto {
-  id: number;
-  title: string;
-  completed: boolean;
-  userId: number;
-}
-
-// View Model (for UI)
-export interface ITodoView {
-  id: string;
-  title: string;
-  isCompleted: boolean;
-}
-```
-
-Create `src/features/Todo/types/ITodoRepository.ts`:
-
-```typescript
-import type { ITodoDto } from './ITodo';
-
-export interface ITodoRepository {
-  fetchTodos(): Promise<ITodoDto[]>;
-  createTodo(todo: Omit<ITodoDto, 'id'>): Promise<ITodoDto>;
-}
-```
-
-### Step 3: Create Data Mappers
-
-Create `src/features/Todo/utils/todoMappers.ts`:
-
-```typescript
-import type { ITodoDto, ITodoView } from '../types/ITodo';
-
-export const todoMappers = {
-  getTodos: {
-    transform(dtos: ITodoDto[]): ITodoView[] {
-      return dtos.map(dto => ({
-        id: dto.id.toString(),
-        title: dto.title,
-        isCompleted: dto.completed
-      }));
-    }
-  }
-};
-```
-
-### Step 4: Implement Repository (Data Access)
-
-Create `src/features/Todo/services/TodoRepository.ts`:
-
-```typescript
-import type { IHttpClient } from '@shared/types/IHttpClient';
-import type { ITodoDto } from '../types/ITodo';
-import type { ITodoRepository } from '../types/ITodoRepository';
-
-export class TodoRepository implements ITodoRepository {
-  constructor(private apiClient: IHttpClient) {}
-
-  async fetchTodos(): Promise<ITodoDto[]> {
-    return this.apiClient.get<ITodoDto[]>('/todos');
-  }
-
-  async createTodo(todo: Omit<ITodoDto, 'id'>): Promise<ITodoDto> {
-    return this.apiClient.post<ITodoDto>('/todos', todo);
-  }
-}
-```
-
-### Step 5: Implement Manager (Business Logic)
-
-Create `src/features/Todo/services/TodoManager.ts`:
-
-```typescript
-import type { ITodoView } from '../types/ITodo';
-import type { ITodoRepository } from '../types/ITodoRepository';
-
-export class TodoManager {
-  constructor(private repository: ITodoRepository) {}
-
-  async getTodos(): Promise<ITodoView[]> {
-    const dtos = await this.repository.fetchTodos();
-    return todoMappers.getTodos.transform(dtos);
-  }
-
-  async addTodo(title: string): Promise<ITodoView> {
-    const dto = await this.repository.createTodo({
-      title,
-      completed: false,
-      userId: 1
-    });
-    return todoMappers.getTodos.transform([dto])[0];
-  }
-}
-```
-
-### Step 6: Wire Up Services
-
-Create `src/features/Todo/services/index.ts`:
-
-```typescript
-import { eComApi } from '@shared/api';
-import { TodoRepository } from './TodoRepository';
-import { TodoManager } from './TodoManager';
-import { todoMappers } from '../utils/todoMappers';
-
-const todoRepository = new TodoRepository(eComApi);
-const todoManager = new TodoManager(todoRepository, todoMappers);
-
-export default todoManager;
-```
-
-### Step 7: Create React Query Hooks
-
-Create `src/features/Todo/hooks/useTodos.ts`:
-
-```typescript
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import todoManager from '../services';
-
-export function useTodos() {
-  return useQuery({
-    queryKey: ['todos'],
-    queryFn: () => todoManager.getTodos()
-  });
-}
-
-export function useAddTodo() {
-  const queryClient = useQueryClient();
-  
-  return useMutation({
-    mutationFn: (title: string) => todoManager.addTodo(title),
-    onSuccess: () => {
-      // Invalidate and refetch todos
-      queryClient.invalidateQueries({ queryKey: ['todos'] });
-    }
-  });
-}
-```
-
-### Step 8: Create Zustand Store (Optional)
-
-If you need local state, create `src/features/Todo/store/todoSliceStore.ts`:
-
-```typescript
-import type { SetCallback } from '@shared/store';
-
-export interface ITodoState {
-  filter: 'all' | 'active' | 'completed';
-}
-
-const initialState: ITodoState = {
-  filter: 'all'
-};
-
-const actions = (set: SetCallback<ITodoState>) => ({
-  setFilter: (filter: ITodoState['filter']) =>
-    set((state) => {
-      state.filter = filter;
-    })
-});
-
-const slice = (set: SetCallback<ITodoState>) => ({
-  ...initialState,
-  ...actions(set)
-});
-
-export type TTodoActions = ReturnType<typeof actions>;
-
-const todoSliceStore = {
-  slice,
-  initialState
-};
-
-export default todoSliceStore;
-```
-
-Then add to global store in `src/shared/store/store.ts`:
-
-```typescript
-import todoSliceStore from '@features/Todo/store/todoSliceStore';
-
-export const slices = {
-  productsSliceStore: productsSliceStore.slice,
-  todoSliceStore: todoSliceStore.slice, // Add this
-};
-```
-
-### Step 9: Create UI Components
-
-Create `src/features/Todo/views/TodoPage.tsx`:
-
-```typescript
-import { useTodos, useAddTodo } from '../hooks/useTodos';
-import { useState } from 'react';
-import styles from './styles/TodoPage.module.scss';
-
-export default function TodoPage() {
-  const { data: todos, isLoading } = useTodos();
-  const addTodo = useAddTodo();
-  const [newTodo, setNewTodo] = useState('');
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (newTodo.trim()) {
-      addTodo.mutate(newTodo);
-      setNewTodo('');
-    }
-  };
-
-  if (isLoading) return <div>Loading...</div>;
-
-  return (
-    <main className={styles.todoPage}>
-      <h1>Todos</h1>
-      
-      <form onSubmit={handleSubmit}>
-        <input
-          type="text"
-          value={newTodo}
-          onChange={(e) => setNewTodo(e.target.value)}
-          placeholder="Add new todo..."
-        />
-        <button type="submit">Add</button>
-      </form>
-
-      <ul>
-        {todos?.map(todo => (
-          <li key={todo.id}>
-            <input type="checkbox" checked={todo.isCompleted} />
-            <span>{todo.title}</span>
-          </li>
-        ))}
-      </ul>
-    </main>
-  );
-}
-```
-
-### Step 10: Create Feature Entry Point
-
-Create `src/features/Todo/index.ts`:
-
-```typescript
-export { default as TodoPage } from './views/TodoPage';
-```
-
-### Step 11: Add Route
-
-Update `src/app/utils/constants.ts`:
-
-```typescript
-export const ROUTES = {
-  HOME: "/",
-  PRODUCTS: "/products",
-  TODOS: "/todos", // Add this
-};
-
-export const NAVIGATION_TABS = [
-  { id: "home", label: "Home", path: ROUTES.HOME },
-  { id: "products", label: "Products", path: ROUTES.PRODUCTS },
-  { id: "todos", label: "Todos", path: ROUTES.TODOS }, // Add this
-];
-```
-
-Update `src/app/views/AppRoutes.tsx`:
-
-```typescript
-import { TodoPage } from "@features/Todo"; // Add import
-
-// In the Routes component:
-<Route path={ROUTES.HOME} element={<RootLayout />}>
-  <Route index element={<HomePage />} />
-  <Route path={ROUTES.PRODUCTS} element={<ProductsPage />} />
-  <Route path={ROUTES.TODOS} element={<TodoPage />} /> {/* Add this */}
-</Route>
-```
-
-### Step 12: Create Styles (Optional)
-
-Create `src/features/Todo/views/styles/TodoPage.module.scss`:
-
-```scss
-.todoPage {
-  padding: 2rem;
-
-  h1 {
-    margin-bottom: 1.5rem;
-  }
-
-  form {
-    display: flex;
-    gap: 0.5rem;
-    margin-bottom: 1.5rem;
-  }
-
-  ul {
-    list-style: none;
-    padding: 0;
-
-    li {
-      display: flex;
-      gap: 0.5rem;
-      padding: 0.5rem;
-      border-bottom: 1px solid #eee;
-    }
-  }
-}
-```
-
-### ✅ Done!
-
-You now have a fully functional feature following the project's architecture!
-
----
-
-## 📚 Development Guidelines
-
-### Naming Conventions
-
-- **Files**: PascalCase for components (`TodoPage.tsx`), camelCase for utilities (`todoMappers.ts`)
-- **Folders**: PascalCase for features (`Products/`), camelCase for utilities (`utils/`)
-- **Interfaces**: Prefix with `I` (`ITodo`, `ITodoRepository`)
-- **Types**: Prefix with `T` (`TProductsActions`)
-- **Stores**: Suffix with `Store` (`productsSliceStore`)
-
-### Import Aliases
-
-Use TypeScript path aliases for cleaner imports:
-
-```typescript
-// ✅ Good
-import { eComApi } from '@shared/api';
-import { TodoPage } from '@features/Todo';
-
-// ❌ Avoid
-import { eComApi } from '../../../shared/api';
-```
-
-### Component Structure
-
-Follow this order in React components:
-
-1. Imports
-2. Types/Interfaces
-3. Component function
-4. Hooks
-5. Event handlers
-6. Render logic
-7. Export
-
-### When to Create a New Feature
-
-Create a new feature folder when:
-- The functionality is a distinct domain concept
-- It has its own routes/pages
-- It needs independent state management
-- It's likely to grow in complexity
-
-### When to Use Shared Code
-
-Put code in `/shared` when:
-- Multiple features need it
-- It's a utility function with no business logic
-- It's a reusable UI component
-- It's a common type or constant
-
----
-
-## 🔧 Available Scripts
-
-```bash
-# Development
-npm run dev          # Start development server
-npm run build        # Build for production
-npm run preview      # Preview production build
-npm run lint         # Run ESLint
-
-# Testing
-npx playwright test           # Run E2E tests
-npx playwright test --ui      # Run with UI
-npx playwright show-report    # View test report
-
-# Type checking
-npx tsc --noEmit     # Check TypeScript types
-```
-
----
-
-## 🔍 Code Examples
-
-### Making API Calls
-
-```typescript
-// In a repository
-async fetchData() {
-  return this.httpClient.get<DataDto[]>('/endpoint');
-}
-```
-
-### Using TanStack Query
-
-```typescript
-// In a hook
-export function useData() {
-  return useQuery({
-    queryKey: ['data'],
-    queryFn: () => dataManager.getData(),
-    staleTime: 5 * 60 * 1000, // 5 minutes
-  });
-}
-```
-
-### Using Zustand
-
-```typescript
-// In a component
-import { useStore } from '@shared/store';
-
-function MyComponent() {
-  const favoriteIds = useStore(state => state.favoriteProducts);
-  const addFavorite = useStore(state => state.addFavoriteProduct);
-  
-  return <button onClick={() => addFavorite('123')}>Add</button>;
-}
-```
-
----
-
-## 🤝 Contributing
-
-1. Follow the feature-folder structure
-2. Maintain type safety (no `any` types)
-3. Write meaningful component and function names
-4. Use the existing patterns as examples
-5. Keep features independent
-
----
-
-## � Related Projects
-
-- **[nestjs-api-starter](../nestjs-api-starter)** — NestJS backend API for this SPA
-- **[Better Auth](https://better-auth.com)** — Authentication library
-- **[shadcn/ui](https://ui.shadcn.com)** — UI component library
-
----
-
-## �📖 Additional Resources
-
-- [Feature-Folder Architecture Article](https://ramonprata.medium.com/how-to-structure-a-react-app-in-2025-spa-ssr-or-native-10d8de7a245a)
-- [Better Auth Documentation](https://better-auth.com/docs)
-- [TanStack Query Documentation](https://tanstack.com/query/latest)
-- [Zustand Documentation](https://zustand-demo.pmnd.rs/)
-- [React Router Documentation](https://reactrouter.com/)
-- [Vite Documentation](https://vitejs.dev/)
-- [Playwright Documentation](https://playwright.dev/)
-
----
-
-## 📝 License
+## License
 
 MIT
+

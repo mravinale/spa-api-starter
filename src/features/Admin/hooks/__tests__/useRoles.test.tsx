@@ -5,25 +5,45 @@ import type { ReactNode } from "react";
 import {
   useRoles,
   useUsersByRole,
-  useCheckPermission,
-  roleKeys,
+  useCreateRole,
+  useDeleteRole,
+  rbacKeys,
 } from "../useRoles";
+import { rbacService } from "../../services/rbacService";
 import { adminService } from "../../services/adminService";
 
-// Mock the admin service
+// Mock the services
+vi.mock("../../services/rbacService", () => ({
+  rbacService: {
+    getRoles: vi.fn(),
+    getRole: vi.fn(),
+    createRole: vi.fn(),
+    updateRole: vi.fn(),
+    deleteRole: vi.fn(),
+    assignPermissions: vi.fn(),
+    getPermissions: vi.fn(),
+    getPermissionsGrouped: vi.fn(),
+    getUserPermissions: vi.fn(),
+    checkPermission: vi.fn(),
+  },
+}));
+
 vi.mock("../../services/adminService", () => ({
   adminService: {
     listUsers: vi.fn(),
-    setRole: vi.fn(),
-    hasPermission: vi.fn(),
   },
 }));
 
 // Get typed mock references
+const mockRbacService = rbacService as unknown as {
+  getRoles: Mock;
+  getRole: Mock;
+  createRole: Mock;
+  deleteRole: Mock;
+};
+
 const mockAdminService = adminService as unknown as {
   listUsers: Mock;
-  setRole: Mock;
-  hasPermission: Mock;
 };
 
 // Create a wrapper with QueryClientProvider
@@ -45,45 +65,34 @@ describe("useRoles hooks", () => {
     vi.clearAllMocks();
   });
 
-  describe("roleKeys", () => {
+  describe("rbacKeys", () => {
     it("should generate correct query keys", () => {
-      expect(roleKeys.all).toEqual(["roles"]);
-      expect(roleKeys.list()).toEqual(["roles", "list"]);
-      expect(roleKeys.usersByRole("admin")).toEqual(["roles", "users", "admin"]);
-      expect(roleKeys.permissions("user-1")).toEqual(["roles", "permissions", "user-1"]);
+      expect(rbacKeys.all).toEqual(["rbac"]);
+      expect(rbacKeys.roles()).toEqual(["rbac", "roles"]);
+      expect(rbacKeys.role("role-1")).toEqual(["rbac", "role", "role-1"]);
+      expect(rbacKeys.permissions()).toEqual(["rbac", "permissions"]);
+      expect(rbacKeys.usersByRole("admin")).toEqual(["rbac", "users", "admin"]);
     });
   });
 
   describe("useRoles", () => {
-    it("should return all available roles", () => {
+    it("should fetch roles from API", async () => {
+      const mockRoles = [
+        { id: "1", name: "admin", displayName: "Admin", description: "Full access", color: "red", isSystem: true },
+        { id: "2", name: "user", displayName: "User", description: "Basic user", color: "gray", isSystem: true },
+      ];
+      mockRbacService.getRoles.mockResolvedValue(mockRoles);
+
       const { result } = renderHook(() => useRoles(), {
         wrapper: createWrapper(),
       });
 
-      expect(result.current.roles).toHaveLength(3);
-      expect(result.current.roles.map((r: { name: string }) => r.name)).toEqual(["admin", "user", "moderator"]);
-    });
-
-    it("should return role by name", () => {
-      const { result } = renderHook(() => useRoles(), {
-        wrapper: createWrapper(),
+      await waitFor(() => {
+        expect(result.current.isSuccess).toBe(true);
       });
 
-      const adminRole = result.current.getRole("admin");
-      expect(adminRole).toBeDefined();
-      expect(adminRole?.displayName).toBe("Admin");
-      expect(adminRole?.color).toBe("red");
-    });
-
-    it("should check if role has permission", () => {
-      const { result } = renderHook(() => useRoles(), {
-        wrapper: createWrapper(),
-      });
-
-      expect(result.current.hasPermission("admin", "user", "delete")).toBe(true);
-      expect(result.current.hasPermission("user", "user", "delete")).toBe(false);
-      expect(result.current.hasPermission("moderator", "user", "ban")).toBe(true);
-      expect(result.current.hasPermission("moderator", "user", "delete")).toBe(false);
+      expect(result.current.data).toHaveLength(2);
+      expect(result.current.data?.[0].name).toBe("admin");
     });
   });
 
@@ -113,26 +122,40 @@ describe("useRoles hooks", () => {
     });
   });
 
-  describe("useCheckPermission", () => {
-    it("should check user permission via API", async () => {
-      mockAdminService.hasPermission.mockResolvedValue({ hasPermission: true });
+  describe("useCreateRole", () => {
+    it("should create a new role", async () => {
+      const newRole = { id: "3", name: "editor", displayName: "Editor", color: "blue", isSystem: false };
+      mockRbacService.createRole.mockResolvedValue(newRole);
 
-      const { result } = renderHook(
-        () => useCheckPermission("user-1", { user: ["delete"] }),
-        { wrapper: createWrapper() }
-      );
-
-      await waitFor(() => {
-        expect(result.current.isSuccess).toBe(true);
+      const { result } = renderHook(() => useCreateRole(), {
+        wrapper: createWrapper(),
       });
 
-      expect(result.current.data).toEqual({ hasPermission: true });
-      expect(mockAdminService.hasPermission).toHaveBeenCalledWith({
-        userId: "user-1",
-        permissions: { user: ["delete"] },
+      await result.current.mutateAsync({
+        name: "editor",
+        displayName: "Editor",
+        color: "blue",
+      });
+
+      expect(mockRbacService.createRole).toHaveBeenCalledWith({
+        name: "editor",
+        displayName: "Editor",
+        color: "blue",
       });
     });
   });
 
-  // Note: useSetUserRole tests are in useUsers.test.tsx
+  describe("useDeleteRole", () => {
+    it("should delete a role", async () => {
+      mockRbacService.deleteRole.mockResolvedValue(undefined);
+
+      const { result } = renderHook(() => useDeleteRole(), {
+        wrapper: createWrapper(),
+      });
+
+      await result.current.mutateAsync("role-1");
+
+      expect(mockRbacService.deleteRole).toHaveBeenCalledWith("role-1");
+    });
+  });
 });
