@@ -32,7 +32,7 @@ async function withDatabase<T>(fn: (pool: Pool) => Promise<T>): Promise<T> {
 async function ensureAdminRole() {
   await withDatabase(async (pool) => {
     await pool.query(`UPDATE "user" SET role = 'admin' WHERE email = $1`, [TEST_USER.email]);
-    await pool.query(`DELETE FROM "session" WHERE "userId" IN (SELECT id FROM "user" WHERE email = $1)`, [TEST_USER.email]);
+    await pool.query(`DELETE FROM session WHERE "userId" IN (SELECT id FROM "user" WHERE email = $1)`, [TEST_USER.email]);
   });
 }
 

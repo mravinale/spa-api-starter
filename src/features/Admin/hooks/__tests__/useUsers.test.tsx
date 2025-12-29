@@ -124,12 +124,16 @@ describe('useCreateUser hook', () => {
       name: 'New User',
       email: 'new@example.com',
       password: 'password123',
+      role: 'member',
+      organizationId: 'org-1',
     });
 
     expect(mockAdminService.createUser).toHaveBeenCalledWith({
       name: 'New User',
       email: 'new@example.com',
       password: 'password123',
+      role: 'member',
+      organizationId: 'org-1',
     });
   });
 });

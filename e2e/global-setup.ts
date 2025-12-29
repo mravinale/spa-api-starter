@@ -26,7 +26,7 @@ async function globalSetup() {
       
       // Clear all sessions for this user to force fresh login with new role
       const sessionsResult = await pool.query(
-        `DELETE FROM "session" WHERE "userId" = $1`,
+        `DELETE FROM session WHERE "userId" = $1`,
         [userId]
       );
       console.log(`✅ Cleared ${sessionsResult.rowCount} existing sessions`);

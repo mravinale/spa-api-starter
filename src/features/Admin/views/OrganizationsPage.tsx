@@ -413,8 +413,9 @@ export function OrganizationsPage() {
                                     <SelectValue />
                                   </SelectTrigger>
                                   <SelectContent>
+                                    {/* Better Auth organization roles: owner, admin, member */}
+                                    <SelectItem value="owner">Owner</SelectItem>
                                     <SelectItem value="admin">Admin</SelectItem>
-                                    <SelectItem value="manager">Manager</SelectItem>
                                     <SelectItem value="member">Member</SelectItem>
                                   </SelectContent>
                                 </Select>
@@ -654,11 +655,14 @@ export function OrganizationsPage() {
                   <SelectValue placeholder="Select role" />
                 </SelectTrigger>
                 <SelectContent>
+                  {/* Better Auth organization roles: owner, admin, member */}
                   <SelectItem value="admin">Admin</SelectItem>
-                  <SelectItem value="manager">Manager</SelectItem>
                   <SelectItem value="member">Member</SelectItem>
                 </SelectContent>
               </Select>
+              <p className="text-sm text-muted-foreground">
+                Admin can manage members. Member has basic access.
+              </p>
             </div>
           </div>
           <DialogFooter>

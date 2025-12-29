@@ -21,11 +21,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Use Better Auth's useSession hook
     const { data: session, isPending: isLoading, refetch } = useSession();
 
+    const rawRole = (session?.user as { role?: string | string[] } | undefined)?.role;
+    const normalizedRole = (() => {
+        if (!rawRole) return "member";
+        const roles = Array.isArray(rawRole)
+            ? rawRole
+            : String(rawRole)
+                .split(",")
+                .map((r) => r.trim())
+                .filter(Boolean);
+
+        if (roles.includes("admin")) return "admin";
+        if (roles.includes("manager")) return "manager";
+        return "member";
+    })();
+
     const user: User | null = session?.user ? {
         id: session.user.id,
         name: session.user.name,
         email: session.user.email,
-        role: (session.user as { role?: string }).role,
+        role: normalizedRole,
         image: session.user.image ?? undefined,
         emailVerified: session.user.emailVerified,
         banned: (session.user as { banned?: boolean }).banned,
@@ -36,7 +51,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } : null;
 
     const isAuthenticated = !!session?.user;
-    const isAdmin = user?.role === "admin";
+    const isAdmin = normalizedRole === "admin";
+    const isManager = normalizedRole === "manager";
+    const isAdminOrManager = isAdmin || isManager;
 
     const login = async (credentials: LoginCredentials) => {
         const result = await signIn.email({
@@ -114,22 +131,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         await refetch();
     };
 
+    const value: AuthContextType = {
+        user,
+        isAuthenticated,
+        isAdmin,
+        isManager,
+        isAdminOrManager,
+        isLoading,
+        login,
+        signup,
+        logout,
+        forgotPassword,
+        resetPassword,
+        sendVerificationEmail,
+        refreshSession,
+    };
+
     return (
-        <AuthContext.Provider
-            value={{
-                user,
-                isAuthenticated,
-                isAdmin,
-                isLoading,
-                login,
-                signup,
-                logout,
-                forgotPassword,
-                resetPassword,
-                sendVerificationEmail,
-                refreshSession,
-            }}
-        >
+        <AuthContext.Provider value={value}>
             {children}
         </AuthContext.Provider>
     );

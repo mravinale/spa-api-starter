@@ -11,6 +11,8 @@ import type {
     PaginatedResponse,
 } from "../types";
 
+const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
+
 /**
  * Admin service for user management operations.
  * Wraps Better Auth admin client methods.
@@ -22,78 +24,69 @@ export const adminService = {
      * List all users with optional filtering and pagination.
      */
     async listUsers(params: UserFilterParams = {}): Promise<PaginatedResponse<AdminUser>> {
-        const { data, error } = await admin.listUsers({
-            query: {
-                limit: params.limit ?? 10,
-                offset: params.offset ?? 0,
-                sortBy: params.sortBy,
-                sortDirection: params.sortDirection,
-                searchValue: params.searchValue,
-                searchField: params.searchField,
-                searchOperator: params.searchOperator,
-                filterField: params.filterField,
-                filterValue: params.filterValue,
-                filterOperator: params.filterOperator,
-            },
-        });
+        const url = new URL(`${API_BASE_URL}/api/admin/users`);
+        url.searchParams.set("limit", String(params.limit ?? 10));
+        url.searchParams.set("offset", String(params.offset ?? 0));
+        if (params.searchValue) url.searchParams.set("searchValue", params.searchValue);
 
-        if (error) {
+        const response = await fetch(url.toString(), { credentials: "include" });
+        if (!response.ok) {
+            const error = await response.json().catch(() => ({}));
             throw new Error(error.message || "Failed to list users");
         }
-
-        return {
-            data: (data?.users ?? []) as unknown as AdminUser[],
-            total: data?.total ?? 0,
-            limit: "limit" in (data ?? {}) ? (data as { limit?: number }).limit : undefined,
-            offset: "offset" in (data ?? {}) ? (data as { offset?: number }).offset : undefined,
-        };
+        return await response.json();
     },
 
     /**
      * Create a new user.
      */
     async createUser(params: CreateUserParams): Promise<AdminUser> {
-        const { data, error } = await admin.createUser({
-            email: params.email,
-            password: params.password,
-            name: params.name,
-            role: params.role as "user" | "admin" | undefined,
-            data: params.data,
+        const response = await fetch(`${API_BASE_URL}/api/admin/users`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            credentials: "include",
+            body: JSON.stringify({
+                email: params.email,
+                password: params.password,
+                name: params.name,
+                role: params.role,
+                organizationId: params.organizationId,
+            }),
         });
-
-        if (error) {
+        if (!response.ok) {
+            const error = await response.json().catch(() => ({}));
             throw new Error(error.message || "Failed to create user");
         }
-
-        // The response contains { user: ... }
-        const userData = data as unknown as { user?: AdminUser } | AdminUser;
-        return "user" in userData ? userData.user as AdminUser : userData as AdminUser;
+        return await response.json();
     },
 
     /**
      * Update a user's details.
      */
     async updateUser(params: UpdateUserParams): Promise<AdminUser> {
-        const { data, error } = await admin.updateUser({
-            userId: params.userId,
-            data: params.data,
+        const response = await fetch(`${API_BASE_URL}/api/admin/users/${params.userId}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            credentials: "include",
+            body: JSON.stringify({ name: params.data.name }),
         });
-
-        if (error) {
+        if (!response.ok) {
+            const error = await response.json().catch(() => ({}));
             throw new Error(error.message || "Failed to update user");
         }
-
-        const userData = data as unknown as { user?: AdminUser } | AdminUser;
-        return "user" in userData ? userData.user as AdminUser : userData as AdminUser;
+        return await response.json();
     },
 
     /**
      * Remove (delete) a user.
      */
     async removeUser(userId: string): Promise<void> {
-        const { error } = await admin.removeUser({ userId });
-
-        if (error) {
+        const response = await fetch(`${API_BASE_URL}/api/admin/users/${userId}`, {
+            method: "DELETE",
+            credentials: "include",
+        });
+        if (!response.ok) {
+            const error = await response.json().catch(() => ({}));
             throw new Error(error.message || "Failed to remove user");
         }
     },
@@ -102,13 +95,14 @@ export const adminService = {
      * Ban a user.
      */
     async banUser(params: BanUserParams): Promise<void> {
-        const { error } = await admin.banUser({
-            userId: params.userId,
-            banReason: params.banReason,
-            banExpiresIn: params.banExpiresIn,
+        const response = await fetch(`${API_BASE_URL}/api/admin/users/${params.userId}/ban`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            credentials: "include",
+            body: JSON.stringify({ banReason: params.banReason }),
         });
-
-        if (error) {
+        if (!response.ok) {
+            const error = await response.json().catch(() => ({}));
             throw new Error(error.message || "Failed to ban user");
         }
     },
@@ -117,9 +111,12 @@ export const adminService = {
      * Unban a user.
      */
     async unbanUser(userId: string): Promise<void> {
-        const { error } = await admin.unbanUser({ userId });
-
-        if (error) {
+        const response = await fetch(`${API_BASE_URL}/api/admin/users/${userId}/unban`, {
+            method: "POST",
+            credentials: "include",
+        });
+        if (!response.ok) {
+            const error = await response.json().catch(() => ({}));
             throw new Error(error.message || "Failed to unban user");
         }
     },
@@ -128,12 +125,15 @@ export const adminService = {
      * Set a user's role.
      */
     async setRole(params: SetRoleParams): Promise<void> {
-        const { error } = await admin.setRole({
-            userId: params.userId,
-            role: params.role as "user" | "admin" | ("user" | "admin")[],
+        const role = Array.isArray(params.role) ? params.role[0] : params.role;
+        const response = await fetch(`${API_BASE_URL}/api/admin/users/${params.userId}/role`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            credentials: "include",
+            body: JSON.stringify({ role }),
         });
-
-        if (error) {
+        if (!response.ok) {
+            const error = await response.json().catch(() => ({}));
             throw new Error(error.message || "Failed to set user role");
         }
     },
@@ -142,12 +142,14 @@ export const adminService = {
      * Set a user's password.
      */
     async setPassword(params: SetPasswordParams): Promise<void> {
-        const { error } = await admin.setUserPassword({
-            userId: params.userId,
-            newPassword: params.newPassword,
+        const response = await fetch(`${API_BASE_URL}/api/admin/users/${params.userId}/password`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            credentials: "include",
+            body: JSON.stringify({ newPassword: params.newPassword }),
         });
-
-        if (error) {
+        if (!response.ok) {
+            const error = await response.json().catch(() => ({}));
             throw new Error(error.message || "Failed to set user password");
         }
     },
@@ -158,23 +160,28 @@ export const adminService = {
      * List all sessions for a user.
      */
     async listUserSessions(userId: string): Promise<UserSession[]> {
-        const { data, error } = await admin.listUserSessions({ userId });
-
-        if (error) {
+        const response = await fetch(`${API_BASE_URL}/api/admin/users/${userId}/sessions`, {
+            credentials: "include",
+        });
+        if (!response.ok) {
+            const error = await response.json().catch(() => ({}));
             throw new Error(error.message || "Failed to list user sessions");
         }
-
-        const sessionsData = data as unknown as { sessions?: UserSession[] } | UserSession[];
-        return Array.isArray(sessionsData) ? sessionsData : (sessionsData?.sessions ?? []);
+        return await response.json();
     },
 
     /**
      * Revoke a specific session.
      */
     async revokeSession(sessionToken: string): Promise<void> {
-        const { error } = await admin.revokeUserSession({ sessionToken });
-
-        if (error) {
+        const response = await fetch(`${API_BASE_URL}/api/admin/users/sessions/revoke`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            credentials: "include",
+            body: JSON.stringify({ sessionToken }),
+        });
+        if (!response.ok) {
+            const error = await response.json().catch(() => ({}));
             throw new Error(error.message || "Failed to revoke session");
         }
     },
@@ -183,11 +190,29 @@ export const adminService = {
      * Revoke all sessions for a user.
      */
     async revokeAllSessions(userId: string): Promise<void> {
-        const { error } = await admin.revokeUserSessions({ userId });
-
-        if (error) {
+        const response = await fetch(`${API_BASE_URL}/api/admin/users/${userId}/sessions/revoke-all`, {
+            method: "POST",
+            credentials: "include",
+        });
+        if (!response.ok) {
+            const error = await response.json().catch(() => ({}));
             throw new Error(error.message || "Failed to revoke all sessions");
         }
+    },
+
+    async getCreateUserMetadata(): Promise<{
+        roles: Array<{ name: string; displayName: string; description?: string; color?: string; isSystem: boolean }>;
+        allowedRoleNames: Array<'admin' | 'manager' | 'member'>;
+        organizations: Array<{ id: string; name: string; slug: string }>;
+    }> {
+        const response = await fetch(`${API_BASE_URL}/api/admin/users/create-metadata`, {
+            credentials: "include",
+        });
+        if (!response.ok) {
+            const error = await response.json().catch(() => ({}));
+            throw new Error(error.message || "Failed to fetch create user metadata");
+        }
+        return await response.json();
     },
 
     // ============ Impersonation ============

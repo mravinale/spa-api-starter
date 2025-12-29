@@ -55,6 +55,7 @@ import {
 } from "../hooks/useUsers"
 import { useAuth } from "@/shared/context/AuthContext"
 import type { AdminUser, UserFilterParams } from "../types"
+import { adminService } from "../services/adminService"
 
 export function UsersPage() {
   // Pagination and filter state
@@ -75,11 +76,23 @@ export function UsersPage() {
   const [selectedUser, setSelectedUser] = useState<AdminUser | null>(null)
 
   // Form states
-  const [newUserData, setNewUserData] = useState({ name: "", email: "", password: "", role: "user" })
+  const [newUserData, setNewUserData] = useState<{ name: string; email: string; password: string; role: 'admin' | 'manager' | 'member'; organizationId?: string }>({ name: "", email: "", password: "", role: "member" })
   const [editUserData, setEditUserData] = useState({ name: "" })
   const [banReason, setBanReason] = useState("")
   const [newRole, setNewRole] = useState("user")
   const [newPassword, setNewPassword] = useState("")
+
+  const [createMeta, setCreateMeta] = useState<null | {
+    roles: Array<{ name: string; displayName: string }>
+    allowedRoleNames: Array<'admin' | 'manager' | 'member'>
+    organizations: Array<{ id: string; name: string; slug: string }>
+  }>(null)
+
+  // Metadata for role change dialog (fetched from backend)
+  const [roleChangeMeta, setRoleChangeMeta] = useState<null | {
+    roles: Array<{ name: string; displayName: string }>
+    allowedRoleNames: Array<'admin' | 'manager' | 'member'>
+  }>(null)
 
   // Build query params
   const queryParams: UserFilterParams = useMemo(() => ({
@@ -109,17 +122,36 @@ export function UsersPage() {
   // Handlers
   const handleCreateUser = async () => {
     try {
+      if (newUserData.role !== "admin" && !newUserData.organizationId) {
+        toast.error("Organization is required for non-admin users")
+        return
+      }
       await createUser.mutateAsync({
         name: newUserData.name,
         email: newUserData.email,
         password: newUserData.password,
         role: newUserData.role,
+        organizationId: newUserData.role === "admin" ? undefined : newUserData.organizationId,
       })
       toast.success("User created successfully")
       setCreateDialogOpen(false)
-      setNewUserData({ name: "", email: "", password: "", role: "user" })
+      setNewUserData({ name: "", email: "", password: "", role: "member" })
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to create user")
+    }
+  }
+
+  const handleOpenCreateDialog = async (open: boolean) => {
+    setCreateDialogOpen(open)
+    if (!open) return
+    try {
+      const meta = await adminService.getCreateUserMetadata()
+      setCreateMeta(meta)
+      const defaultRole = meta.allowedRoleNames.includes("member") ? "member" : meta.allowedRoleNames[0]
+      const defaultOrgId = meta.organizations[0]?.id
+      setNewUserData({ name: "", email: "", password: "", role: defaultRole, organizationId: defaultOrgId })
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to load user creation metadata")
     }
   }
 
@@ -167,10 +199,26 @@ export function UsersPage() {
       await setUserRole.mutateAsync({ userId: selectedUser.id, role: newRole })
       toast.success("Role updated successfully")
       setRoleDialogOpen(false)
-      setNewRole("user")
+      setNewRole("member")
       setSelectedUser(null)
+      setRoleChangeMeta(null)
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to update role")
+    }
+  }
+
+  const handleOpenRoleDialog = async (user: AdminUser) => {
+    setSelectedUser(user)
+    setNewRole(user.role || "member")
+    setRoleDialogOpen(true)
+    try {
+      const meta = await adminService.getCreateUserMetadata()
+      setRoleChangeMeta({
+        roles: meta.roles,
+        allowedRoleNames: meta.allowedRoleNames,
+      })
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to load role options")
     }
   }
 
@@ -310,11 +358,7 @@ export function UsersPage() {
                 Edit User
               </DropdownMenuItem>
               <DropdownMenuItem
-                onClick={() => {
-                  setSelectedUser(user)
-                  setNewRole(user.role || "user")
-                  setRoleDialogOpen(true)
-                }}
+                onClick={() => handleOpenRoleDialog(user)}
               >
                 <IconShield className="mr-2 h-4 w-4" />
                 Change Role
@@ -403,7 +447,7 @@ export function UsersPage() {
       />
 
       {/* Create User Dialog */}
-      <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
+      <Dialog open={createDialogOpen} onOpenChange={handleOpenCreateDialog}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Create New User</DialogTitle>
@@ -443,17 +487,44 @@ export function UsersPage() {
               <Label htmlFor="role">Role</Label>
               <Select
                 value={newUserData.role}
-                onValueChange={(value) => setNewUserData({ ...newUserData, role: value })}
+                onValueChange={(value) => setNewUserData({ ...newUserData, role: value as any })}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select role" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="user">User</SelectItem>
-                  <SelectItem value="admin">Admin</SelectItem>
+                  {(createMeta?.allowedRoleNames ?? ["member"]).map((roleName) => {
+                    const label = createMeta?.roles.find((r) => r.name === roleName)?.displayName ?? roleName
+                    return (
+                      <SelectItem key={roleName} value={roleName}>
+                        {label}
+                      </SelectItem>
+                    )
+                  })}
                 </SelectContent>
               </Select>
             </div>
+
+            {newUserData.role !== "admin" && (
+              <div className="grid gap-2">
+                <Label htmlFor="organization">Organization</Label>
+                <Select
+                  value={newUserData.organizationId}
+                  onValueChange={(value) => setNewUserData({ ...newUserData, organizationId: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select organization" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(createMeta?.organizations ?? []).map((org) => (
+                      <SelectItem key={org.id} value={org.id}>
+                        {org.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setCreateDialogOpen(false)}>
@@ -527,7 +598,10 @@ export function UsersPage() {
       </Dialog>
 
       {/* Change Role Dialog */}
-      <Dialog open={roleDialogOpen} onOpenChange={setRoleDialogOpen}>
+      <Dialog open={roleDialogOpen} onOpenChange={(open) => {
+        setRoleDialogOpen(open)
+        if (!open) setRoleChangeMeta(null)
+      }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Change User Role</DialogTitle>
@@ -543,8 +617,18 @@ export function UsersPage() {
                   <SelectValue placeholder="Select role" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="user">User</SelectItem>
-                  <SelectItem value="admin">Admin</SelectItem>
+                  {roleChangeMeta ? (
+                    roleChangeMeta.allowedRoleNames.map((roleName) => {
+                      const roleInfo = roleChangeMeta.roles.find((r) => r.name === roleName)
+                      return (
+                        <SelectItem key={roleName} value={roleName}>
+                          {roleInfo?.displayName ?? roleName}
+                        </SelectItem>
+                      )
+                    })
+                  ) : (
+                    <SelectItem value="member" disabled>Loading...</SelectItem>
+                  )}
                 </SelectContent>
               </Select>
             </div>
@@ -553,7 +637,7 @@ export function UsersPage() {
             <Button variant="outline" onClick={() => setRoleDialogOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={handleSetRole} disabled={setUserRole.isPending}>
+            <Button onClick={handleSetRole} disabled={setUserRole.isPending || !roleChangeMeta}>
               {setUserRole.isPending ? "Updating..." : "Update Role"}
             </Button>
           </DialogFooter>

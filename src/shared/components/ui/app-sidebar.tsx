@@ -26,7 +26,7 @@ import {
 import { useAuth } from "@/shared/context/AuthContext"
 
 // Navigation configuration
-const getNavItems = (isAdmin: boolean, pathname: string) => ({
+const getNavItems = (isAdminOrManager: boolean, pathname: string) => ({
   navMain: [],
   navGroups: [
     {
@@ -42,7 +42,7 @@ const getNavItems = (isAdmin: boolean, pathname: string) => ({
         },
       ],
     },
-    ...(isAdmin ? [
+    ...(isAdminOrManager ? [
       {
         title: "Admin",
         icon: IconShield,
@@ -86,9 +86,9 @@ const getNavItems = (isAdmin: boolean, pathname: string) => ({
 })
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
-  const { user, isAdmin } = useAuth()
+  const { user, isAdminOrManager } = useAuth()
   const location = useLocation()
-  const navItems = getNavItems(isAdmin, location.pathname)
+  const navItems = getNavItems(isAdminOrManager, location.pathname)
 
   const userData = {
     name: user?.name ?? "User",

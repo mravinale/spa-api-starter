@@ -16,6 +16,8 @@ export interface AuthState {
     user: User | null;
     isAuthenticated: boolean;
     isAdmin: boolean;
+    isManager: boolean;
+    isAdminOrManager: boolean;
 }
 
 export interface LoginCredentials {

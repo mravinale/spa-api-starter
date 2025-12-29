@@ -16,6 +16,7 @@ import { ThemeProvider } from "@shared/components/ui";
 import { AuthProvider } from "@shared/context/AuthContext";
 import { ProtectedRoute } from "@shared/components/ProtectedRoute";
 import { AdminRoute } from "@shared/components/AdminRoute";
+import { AdminOnlyRoute } from "@shared/components/AdminOnlyRoute";
 import { Toaster } from "@shared/components/ui/sonner";
 
 const queryClient = new QueryClient();
@@ -75,9 +76,9 @@ const AppRoutes = () => {
                 <Route
                   path="admin/roles"
                   element={
-                    <AdminRoute>
+                    <AdminOnlyRoute>
                       <RolesPage />
-                    </AdminRoute>
+                    </AdminOnlyRoute>
                   }
                 />
                 

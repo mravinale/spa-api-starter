@@ -83,7 +83,8 @@ export interface CreateUserParams {
     email: string;
     password: string;
     name: string;
-    role?: string;
+    role: 'admin' | 'manager' | 'member';
+    organizationId?: string;
     data?: Record<string, unknown>;
 }
 
