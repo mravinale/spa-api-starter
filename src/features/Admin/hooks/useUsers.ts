@@ -83,6 +83,20 @@ export function useRemoveUser() {
 }
 
 /**
+ * Hook to bulk remove multiple users.
+ */
+export function useRemoveUsers() {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: (userIds: string[]) => adminService.removeUsers(userIds),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: userKeys.lists() });
+        },
+    });
+}
+
+/**
  * Hook to ban a user.
  */
 export function useBanUser() {

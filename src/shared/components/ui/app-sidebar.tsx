@@ -5,7 +5,6 @@ import {
   IconDashboard,
   IconHome,
   IconInnerShadowTop,
-  IconMail,
   IconShield,
   IconUsers,
   IconUserScan,
@@ -22,7 +21,10 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarGroup,
+  SidebarGroupLabel,
 } from "@/shared/components/ui/sidebar"
+import { OrganizationSwitcher } from "@/shared/components/OrganizationSwitcher"
 import { useAuth } from "@/shared/context/AuthContext"
 
 // Navigation configuration
@@ -46,14 +48,8 @@ const getNavItems = (isAdminOrManager: boolean, pathname: string) => ({
       {
         title: "Admin",
         icon: IconShield,
-        isActive: pathname.startsWith("/admin") || pathname === "/invitations",
+        isActive: pathname.startsWith("/admin"),
         items: [
-          {
-            title: "My Invitations",
-            url: "/invitations",
-            icon: IconMail,
-            isActive: pathname === "/invitations",
-          },
           {
             title: "Users",
             url: "/admin/users",
@@ -114,6 +110,14 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         </SidebarMenu>
       </SidebarHeader>
       <SidebarContent>
+        {isAdminOrManager && (
+          <SidebarGroup>
+            <SidebarGroupLabel>Organization</SidebarGroupLabel>
+            <div className="px-2">
+              <OrganizationSwitcher />
+            </div>
+          </SidebarGroup>
+        )}
         <NavMain items={navItems.navMain} groups={navItems.navGroups} />
         <NavSecondary items={navItems.navSecondary} className="mt-auto" />
       </SidebarContent>

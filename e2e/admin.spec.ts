@@ -224,6 +224,135 @@ test.describe('Admin Panel E2E Tests', () => {
     });
   });
 
+  test.describe('Bulk Delete Users', () => {
+    test.beforeEach(async ({ page }) => {
+      await loginAsAdmin(page, '/admin/users');
+    });
+
+    test('should show checkboxes for row selection', async ({ page }) => {
+      // Wait for table to load
+      await page.waitForSelector('table tbody tr');
+      
+      // Check that checkboxes are visible in the table header and rows
+      const headerCheckbox = page.locator('table thead th').first().getByRole('checkbox');
+      await expect(headerCheckbox).toBeVisible();
+      
+      const rowCheckbox = page.locator('table tbody tr').first().getByRole('checkbox');
+      await expect(rowCheckbox).toBeVisible();
+    });
+
+    test('should select individual users with checkboxes', async ({ page }) => {
+      // Wait for table to load
+      await page.waitForSelector('table tbody tr');
+      
+      // Click checkbox on first row
+      const firstRowCheckbox = page.locator('table tbody tr').first().getByRole('checkbox');
+      await firstRowCheckbox.click();
+      
+      // Verify selection count shows
+      await expect(page.getByText(/1 of \d+ row\(s\) selected/i)).toBeVisible();
+    });
+
+    test('should select all users with header checkbox', async ({ page }) => {
+      // Wait for table to load
+      await page.waitForSelector('table tbody tr');
+      
+      // Click header checkbox to select all
+      const headerCheckbox = page.locator('table thead th').first().getByRole('checkbox');
+      await headerCheckbox.click();
+      
+      // Verify all rows are selected (selection count updates)
+      await expect(page.getByText(/\d+ of \d+ row\(s\) selected/i)).toBeVisible();
+    });
+
+    test('should show bulk delete button when users are selected', async ({ page }) => {
+      // Wait for table to load
+      await page.waitForSelector('table tbody tr');
+      
+      // Initially, delete button should not be visible
+      await expect(page.getByRole('button', { name: /delete \(\d+\)/i })).not.toBeVisible();
+      
+      // Select a user
+      const firstRowCheckbox = page.locator('table tbody tr').first().getByRole('checkbox');
+      await firstRowCheckbox.click();
+      
+      // Now delete button should appear
+      await expect(page.getByRole('button', { name: /delete \(1\)/i })).toBeVisible();
+    });
+
+    test('should show confirmation dialog when clicking bulk delete', async ({ page }) => {
+      // Wait for table to load
+      await page.waitForSelector('table tbody tr');
+      
+      // Select a user
+      const firstRowCheckbox = page.locator('table tbody tr').first().getByRole('checkbox');
+      await firstRowCheckbox.click();
+      
+      // Click the delete button
+      await page.getByRole('button', { name: /delete \(1\)/i }).click();
+      
+      // Verify confirmation dialog appears
+      await expect(page.getByRole('dialog')).toBeVisible();
+      await expect(page.getByRole('heading', { name: /delete 1 user/i })).toBeVisible();
+      await expect(page.getByText(/are you sure you want to delete/i)).toBeVisible();
+    });
+
+    test('should cancel bulk delete when clicking cancel', async ({ page }) => {
+      // Wait for table to load
+      await page.waitForSelector('table tbody tr');
+      
+      // Select a user
+      const firstRowCheckbox = page.locator('table tbody tr').first().getByRole('checkbox');
+      await firstRowCheckbox.click();
+      
+      // Click the delete button
+      await page.getByRole('button', { name: /delete \(1\)/i }).click();
+      
+      // Click cancel
+      await page.getByRole('button', { name: /cancel/i }).click();
+      
+      // Dialog should close
+      await expect(page.getByRole('dialog')).not.toBeVisible();
+      
+      // Selection should still be there
+      await expect(page.getByRole('button', { name: /delete \(1\)/i })).toBeVisible();
+    });
+
+    test('should update selection count when selecting multiple users', async ({ page }) => {
+      // Wait for table to load
+      await page.waitForSelector('table tbody tr');
+      
+      const rows = page.locator('table tbody tr');
+      const rowCount = await rows.count();
+      
+      if (rowCount >= 2) {
+        // Select first user
+        await rows.nth(0).getByRole('checkbox').click();
+        await expect(page.getByRole('button', { name: /delete \(1\)/i })).toBeVisible();
+        
+        // Select second user
+        await rows.nth(1).getByRole('checkbox').click();
+        await expect(page.getByRole('button', { name: /delete \(2\)/i })).toBeVisible();
+      }
+    });
+
+    test('should deselect users when unchecking', async ({ page }) => {
+      // Wait for table to load
+      await page.waitForSelector('table tbody tr');
+      
+      // Select a user
+      const firstRowCheckbox = page.locator('table tbody tr').first().getByRole('checkbox');
+      await firstRowCheckbox.click();
+      await expect(page.getByRole('button', { name: /delete \(1\)/i })).toBeVisible();
+      
+      // Deselect the user
+      await firstRowCheckbox.click();
+      
+      // Delete button should disappear
+      await expect(page.getByRole('button', { name: /delete \(\d+\)/i })).not.toBeVisible();
+    });
+  });
+
   test.describe('Edit Organization', () => {
     test.beforeEach(async ({ page }) => {
       await loginAsAdmin(page, '/admin/organizations');
@@ -245,26 +374,6 @@ test.describe('Admin Panel E2E Tests', () => {
         // Look for edit button
         const editButton = page.getByRole('button', { name: /edit/i });
         await expect(editButton).toBeVisible();
-      }
-    });
-  });
-
-  test.describe('User Invitations Page', () => {
-    test.beforeEach(async ({ page }) => {
-      await login(page);
-      await page.goto('/invitations');
-      await page.waitForLoadState('networkidle');
-    });
-
-    test('should display invitations page', async ({ page }) => {
-      await expect(page.getByRole('heading', { name: /my invitations/i })).toBeVisible();
-    });
-
-    test('should show empty state when no invitations', async ({ page }) => {
-      // Either shows invitations or empty state
-      const hasInvitations = await page.locator('.grid > div').count() > 0;
-      if (!hasInvitations) {
-        await expect(page.getByText(/no pending invitations/i)).toBeVisible();
       }
     });
   });

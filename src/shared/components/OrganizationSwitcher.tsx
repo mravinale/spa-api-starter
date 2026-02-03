@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import {
   IconBuilding,
   IconCheck,
@@ -29,13 +29,7 @@ import { Input } from "@/shared/components/ui/input"
 import { Label } from "@/shared/components/ui/label"
 import { Skeleton } from "@/shared/components/ui/skeleton"
 
-import {
-  useOrganizations,
-  useCreateOrganization,
-  useSetActiveOrganization,
-  useActiveMember,
-  useLeaveOrganization,
-} from "@/features/Admin/hooks/useOrganizations"
+import { organization } from "@/shared/lib/auth-client"
 
 interface Organization {
   id: string
@@ -47,53 +41,89 @@ interface Organization {
 export function OrganizationSwitcher() {
   const [createDialogOpen, setCreateDialogOpen] = useState(false)
   const [newOrgData, setNewOrgData] = useState({ name: "", slug: "" })
+  const [organizations, setOrganizations] = useState<Organization[]>([])
+  const [activeMember, setActiveMember] = useState<{ organizationId?: string } | null>(null)
+  const [orgsLoading, setOrgsLoading] = useState(true)
 
-  // Queries
-  const { data: organizations, isLoading: orgsLoading } = useOrganizations()
-  const { data: activeMember } = useActiveMember()
+  // Fetch organizations using Better Auth client
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const [orgsResult, memberResult] = await Promise.all([
+          organization.list(),
+          organization.getActiveMember(),
+        ])
+        setOrganizations((orgsResult.data ?? []) as Organization[])
+        setActiveMember(memberResult.data as { organizationId?: string } | null)
+      } catch (error) {
+        console.error("Failed to fetch organizations:", error)
+      } finally {
+        setOrgsLoading(false)
+      }
+    }
+    fetchData()
+  }, [])
 
-  // Mutations
-  const createOrg = useCreateOrganization()
-  const setActiveOrg = useSetActiveOrganization()
-  const leaveOrg = useLeaveOrganization()
-
-  // Cast organizations to proper type
-  const orgsList = (organizations ?? []) as Organization[]
+  const [isLoading, setIsLoading] = useState(false)
 
   // Find active organization
-  const activeOrg = orgsList.find(
-    (org) => org.id === (activeMember as { organizationId?: string })?.organizationId
+  const activeOrg = organizations.find(
+    (org) => org.id === activeMember?.organizationId
   )
 
+  const refreshData = async () => {
+    const [orgsResult, memberResult] = await Promise.all([
+      organization.list(),
+      organization.getActiveMember(),
+    ])
+    setOrganizations((orgsResult.data ?? []) as Organization[])
+    setActiveMember(memberResult.data as { organizationId?: string } | null)
+  }
+
   const handleSetActive = async (orgId: string) => {
+    setIsLoading(true)
     try {
-      await setActiveOrg.mutateAsync(orgId)
+      const result = await organization.setActive({ organizationId: orgId })
+      if (result.error) {
+        throw new Error(result.error.message || "Failed to switch organization")
+      }
       toast.success("Switched organization")
+      // Reload page to refresh session data across the app
+      window.location.reload()
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to switch organization")
+      setIsLoading(false)
     }
   }
 
   const handleCreateOrg = async () => {
+    setIsLoading(true)
     try {
-      await createOrg.mutateAsync({
+      await organization.create({
         name: newOrgData.name,
         slug: newOrgData.slug.toLowerCase().replace(/\s+/g, "-"),
       })
+      await refreshData()
       toast.success("Organization created successfully")
       setCreateDialogOpen(false)
       setNewOrgData({ name: "", slug: "" })
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to create organization")
+    } finally {
+      setIsLoading(false)
     }
   }
 
   const handleLeaveOrg = async (orgId: string) => {
+    setIsLoading(true)
     try {
-      await leaveOrg.mutateAsync(orgId)
+      await organization.leave({ organizationId: orgId })
+      await refreshData()
       toast.success("Left organization")
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to leave organization")
+    } finally {
+      setIsLoading(false)
     }
   }
 
@@ -118,12 +148,12 @@ export function OrganizationSwitcher() {
         <DropdownMenuContent align="start" className="w-56">
           <DropdownMenuLabel>Organizations</DropdownMenuLabel>
           <DropdownMenuSeparator />
-          {orgsList.length === 0 ? (
+          {organizations.length === 0 ? (
             <DropdownMenuItem disabled>
               No organizations
             </DropdownMenuItem>
           ) : (
-            orgsList.map((org) => (
+            organizations.map((org) => (
               <DropdownMenuItem
                 key={org.id}
                 onClick={() => handleSetActive(org.id)}
@@ -195,8 +225,8 @@ export function OrganizationSwitcher() {
             <Button variant="outline" onClick={() => setCreateDialogOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={handleCreateOrg} disabled={createOrg.isPending}>
-              {createOrg.isPending ? "Creating..." : "Create"}
+            <Button onClick={handleCreateOrg} disabled={isLoading}>
+              {isLoading ? "Creating..." : "Create"}
             </Button>
           </DialogFooter>
         </DialogContent>

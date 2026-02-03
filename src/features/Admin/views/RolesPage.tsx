@@ -1,14 +1,12 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import {
   useRoles,
-  useUsersByRole,
   useCreateRole,
   useUpdateRole,
   useDeleteRole,
   usePermissionsGrouped,
   useAssignPermissions,
 } from "../hooks/useRoles";
-import { useSetUserRole } from "../hooks/useUsers";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/shared/components/ui/card";
 import { Badge } from "@/shared/components/ui/badge";
 import { Button } from "@/shared/components/ui/button";
@@ -30,11 +28,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/shared/components/ui/select";
-import { Avatar, AvatarFallback, AvatarImage } from "@/shared/components/ui/avatar";
 import {
-  IconUsers,
-  IconChevronDown,
-  IconChevronUp,
   IconPlus,
   IconEdit,
   IconTrash,
@@ -43,7 +37,7 @@ import {
 import { toast } from "sonner";
 import { roleColorMap, ROLE_COLORS } from "../types/rbac";
 import type { Role, Permission } from "../types/rbac";
-import type { AdminUser } from "../types";
+import { useAuth } from "@/shared/context/AuthContext";
 
 /**
  * Component to display permissions for a role
@@ -73,79 +67,20 @@ function PermissionBadges({ permissions }: { permissions: Permission[] }) {
 }
 
 /**
- * User list within a role card
- */
-function RoleUserList({ 
-  role, 
-  onChangeRole 
-}: { 
-  role: Role; 
-  onChangeRole: (user: AdminUser) => void;
-}) {
-  const { data, isLoading } = useUsersByRole(role.name);
-  const users = data?.data ?? [];
-
-  if (isLoading) {
-    return <div className="text-sm text-muted-foreground">Loading users...</div>;
-  }
-
-  if (users.length === 0) {
-    return <div className="text-sm text-muted-foreground italic">No users with this role</div>;
-  }
-
-  return (
-    <div className="space-y-2">
-      {users.slice(0, 5).map((user) => (
-        <div key={user.id} className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Avatar className="h-6 w-6">
-              <AvatarImage src={user.image ?? undefined} />
-              <AvatarFallback className="text-xs">
-                {user.name?.charAt(0) ?? user.email.charAt(0)}
-              </AvatarFallback>
-            </Avatar>
-            <span className="text-sm truncate max-w-[120px]">{user.name || user.email}</span>
-          </div>
-          <Button 
-            variant="ghost" 
-            size="sm" 
-            className="h-6 text-xs"
-            onClick={() => onChangeRole(user)}
-          >
-            Change
-          </Button>
-        </div>
-      ))}
-      {users.length > 5 && (
-        <div className="text-xs text-muted-foreground">
-          +{users.length - 5} more users
-        </div>
-      )}
-    </div>
-  );
-}
-
-/**
  * Card component for displaying a single role
  */
 function RoleCard({ 
   role,
   permissions,
-  onChangeRole,
   onEdit,
   onDelete,
   onManagePermissions,
-  expanded,
-  onToggleExpand,
 }: { 
   role: Role;
   permissions: Permission[];
-  onChangeRole: (user: AdminUser) => void;
   onEdit: () => void;
   onDelete: () => void;
   onManagePermissions: () => void;
-  expanded: boolean;
-  onToggleExpand: () => void;
 }) {
   return (
     <Card data-testid={`role-card-${role.name}`}>
@@ -174,23 +109,6 @@ function RoleCard({
           </div>
           <PermissionBadges permissions={permissions} />
         </div>
-        
-        {/* Users section */}
-        <div className="space-y-2 pt-2 border-t">
-          <button
-            onClick={onToggleExpand}
-            className="flex items-center gap-1 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors w-full"
-          >
-            <IconUsers className="h-4 w-4" />
-            <span>Users with this role</span>
-            {expanded ? (
-              <IconChevronUp className="h-4 w-4 ml-auto" />
-            ) : (
-              <IconChevronDown className="h-4 w-4 ml-auto" />
-            )}
-          </button>
-          {expanded && <RoleUserList role={role} onChangeRole={onChangeRole} />}
-        </div>
 
         {/* Actions */}
         {!role.isSystem && (
@@ -216,16 +134,16 @@ function RoleCard({
  * Allows CRUD operations on roles and permission management.
  */
 export function RolesPage() {
-  const { data: roles = [], isLoading } = useRoles();
+  const { isAdmin } = useAuth();
+  const { data: allRoles = [], isLoading } = useRoles();
+  
+  // Managers can only see and edit the "member" role
+  const roles = isAdmin ? allRoles : allRoles.filter(role => role.name === "member");
   const { data: permissionsGrouped = {} } = usePermissionsGrouped();
   const createRole = useCreateRole();
   const updateRole = useUpdateRole();
   const deleteRole = useDeleteRole();
   const assignPermissions = useAssignPermissions();
-  const setUserRole = useSetUserRole();
-  
-  // State for expanded cards
-  const [expandedRoles, setExpandedRoles] = useState<Record<string, boolean>>({});
   
   // State for role permissions (fetched individually)
   const [rolePermissions, setRolePermissions] = useState<Record<string, Permission[]>>({});
@@ -235,12 +153,8 @@ export function RolesPage() {
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [permissionsDialogOpen, setPermissionsDialogOpen] = useState(false);
-  const [changeRoleDialogOpen, setChangeRoleDialogOpen] = useState(false);
-  
   // State for selected items
   const [selectedRole, setSelectedRole] = useState<Role | null>(null);
-  const [selectedUser, setSelectedUser] = useState<AdminUser | null>(null);
-  const [newRole, setNewRole] = useState("");
   
   // Form state
   const [formData, setFormData] = useState({
@@ -347,19 +261,6 @@ export function RolesPage() {
     }
   };
 
-  const handleChangeUserRole = async () => {
-    if (!selectedUser || !newRole) return;
-    try {
-      await setUserRole.mutateAsync({ userId: selectedUser.id, role: newRole });
-      toast.success(`Role updated for ${selectedUser.name || selectedUser.email}`);
-      setChangeRoleDialogOpen(false);
-      setSelectedUser(null);
-      setNewRole("");
-    } catch (error) {
-      toast.error("Failed to update role");
-    }
-  };
-
   const openEditDialog = (role: Role) => {
     setSelectedRole(role);
     setFormData({
@@ -378,22 +279,12 @@ export function RolesPage() {
     setPermissionsDialogOpen(true);
   };
 
-  const openChangeRoleDialog = (user: AdminUser) => {
-    setSelectedUser(user);
-    setNewRole(user.role || "user");
-    setChangeRoleDialogOpen(true);
-  };
-
-  const toggleExpand = (roleName: string) => {
-    setExpandedRoles((prev) => ({ ...prev, [roleName]: !prev[roleName] }));
-  };
-
   if (isLoading) {
     return <div className="p-4">Loading roles...</div>;
   }
 
   return (
-    <div className="space-y-6">
+    <div className="flex flex-1 flex-col gap-4 p-4 lg:p-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -402,10 +293,12 @@ export function RolesPage() {
             Manage role-based access control for your application
           </p>
         </div>
-        <Button onClick={() => setCreateDialogOpen(true)}>
-          <IconPlus className="h-4 w-4 mr-2" />
-          Create Role
-        </Button>
+        {isAdmin && (
+          <Button onClick={() => setCreateDialogOpen(true)}>
+            <IconPlus className="h-4 w-4 mr-2" />
+            Create Role
+          </Button>
+        )}
       </div>
 
       {/* Roles Grid */}
@@ -415,12 +308,9 @@ export function RolesPage() {
             key={role.id} 
             role={role}
             permissions={rolePermissions[role.id] || []}
-            onChangeRole={openChangeRoleDialog}
             onEdit={() => openEditDialog(role)}
             onDelete={() => { setSelectedRole(role); setDeleteDialogOpen(true); }}
             onManagePermissions={() => openPermissionsDialog(role)}
-            expanded={expandedRoles[role.name] ?? false}
-            onToggleExpand={() => toggleExpand(role.name)}
           />
         ))}
       </div>
@@ -600,41 +490,6 @@ export function RolesPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Change User Role Dialog */}
-      <Dialog open={changeRoleDialogOpen} onOpenChange={setChangeRoleDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Change User Role</DialogTitle>
-            <DialogDescription>
-              Change the role for {selectedUser?.name || selectedUser?.email}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="py-4">
-            <Label className="mb-2 block">Select new role</Label>
-            <Select value={newRole} onValueChange={setNewRole}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select a role" />
-              </SelectTrigger>
-              <SelectContent>
-                {roles.map((role) => (
-                  <SelectItem key={role.id} value={role.name}>
-                    {role.displayName}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setChangeRoleDialogOpen(false)}>Cancel</Button>
-            <Button 
-              onClick={handleChangeUserRole}
-              disabled={setUserRole.isPending || newRole === selectedUser?.role}
-            >
-              {setUserRole.isPending ? "Saving..." : "Save"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

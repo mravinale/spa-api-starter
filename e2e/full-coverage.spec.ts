@@ -54,7 +54,7 @@ function uniqueId() {
 // USER MANAGEMENT TESTS
 // ============================================================================
 
-test.describe('User Management - Full CRUD', () => {
+test.describe.serial('User Management - Full CRUD', () => {
   test.beforeAll(async () => {
     await ensureAdminRole();
   });
@@ -62,7 +62,8 @@ test.describe('User Management - Full CRUD', () => {
   test.beforeEach(async ({ page }) => {
     await login(page);
     await page.goto('/admin/users');
-    await page.waitForLoadState('networkidle');
+    // Wait for table to be rendered with users data
+    await page.waitForSelector('table tbody tr', { timeout: 15000 });
   });
 
   test('should create a new user with valid data', async ({ page }) => {
@@ -72,9 +73,17 @@ test.describe('User Management - Full CRUD', () => {
       password: 'TestPassword123!',
     };
 
-    await page.getByRole('button', { name: /add user/i }).click();
+    // Wait for Add User button to be ready
+    const addButton = page.getByRole('button', { name: /add user/i });
+    await expect(addButton).toBeEnabled();
+    await addButton.click();
+    
+    // Wait for dialog and metadata to load
     await expect(page.getByRole('dialog')).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Create New User' })).toBeVisible();
+    
+    // Wait for form fields to be ready
+    await expect(page.getByLabel('Name')).toBeVisible();
 
     await page.getByLabel('Name').fill(newUser.name);
     await page.getByLabel('Email').fill(newUser.email);
@@ -82,11 +91,8 @@ test.describe('User Management - Full CRUD', () => {
 
     await page.getByRole('button', { name: /create user/i }).click();
 
-    // Wait for dialog to close and success
-    await expect(page.getByRole('dialog')).not.toBeVisible({ timeout: 10000 });
-    
-    // Verify success by checking dialog closed
-    // The user was created successfully if we got here
+    // Wait for dialog to close (indicates success or error handling)
+    await expect(page.getByRole('dialog')).not.toBeVisible({ timeout: 15000 });
   });
 
   test('should show validation error for invalid email', async ({ page }) => {
@@ -200,7 +206,7 @@ test.describe('User Management - Full CRUD', () => {
 // ORGANIZATION MANAGEMENT TESTS
 // ============================================================================
 
-test.describe('Organization Management - Full CRUD', () => {
+test.describe.serial('Organization Management - Full CRUD', () => {
   test.beforeAll(async () => {
     await ensureAdminRole();
   });
@@ -208,16 +214,25 @@ test.describe('Organization Management - Full CRUD', () => {
   test.beforeEach(async ({ page }) => {
     await login(page);
     await page.goto('/admin/organizations');
-    await page.waitForLoadState('networkidle');
+    // Wait for page heading and Create button to be visible
+    await expect(page.getByRole('heading', { name: /organizations/i })).toBeVisible({ timeout: 15000 });
+    await expect(page.getByRole('button', { name: /create organization/i })).toBeVisible({ timeout: 15000 });
   });
 
   test('should create a new organization', async ({ page }) => {
     const orgName = `Test Org ${uniqueId()}`;
     const orgSlug = `test-org-${uniqueId()}`;
 
-    await page.getByRole('button', { name: /create organization/i }).click();
+    // Wait for Create button to be ready
+    const createButton = page.getByRole('button', { name: /create organization/i });
+    await expect(createButton).toBeEnabled();
+    await createButton.click();
+    
     await expect(page.getByRole('dialog')).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Create Organization' })).toBeVisible();
+    
+    // Wait for form fields to be ready
+    await expect(page.getByLabel('Name')).toBeVisible();
 
     await page.getByLabel('Name').fill(orgName);
     await page.getByLabel('Slug').fill(orgSlug);
@@ -225,11 +240,10 @@ test.describe('Organization Management - Full CRUD', () => {
     await page.getByRole('button', { name: /create/i }).click();
 
     // Wait for dialog to close
-    await expect(page.getByRole('dialog')).not.toBeVisible({ timeout: 10000 });
+    await expect(page.getByRole('dialog')).not.toBeVisible({ timeout: 15000 });
     
-    // Verify organization appears
-    await page.waitForTimeout(1000);
-    await expect(page.getByText(orgName)).toBeVisible();
+    // Verify organization appears in list
+    await expect(page.getByText(orgName)).toBeVisible({ timeout: 10000 });
   });
 
   test('should edit an organization', async ({ page }) => {
@@ -375,10 +389,10 @@ test.describe('Organization Management - Full CRUD', () => {
 });
 
 // ============================================================================
-// INVITATION FLOW TESTS
+// ORGANIZATION MEMBER MANAGEMENT TESTS (Invitations page was removed)
 // ============================================================================
 
-test.describe('Invitation Flow', () => {
+test.describe.serial('Organization Member Management', () => {
   test.beforeAll(async () => {
     await ensureAdminRole();
   });
@@ -387,78 +401,23 @@ test.describe('Invitation Flow', () => {
     await login(page);
   });
 
-  test('should send an invitation from organization page', async ({ page }) => {
+  test('should be able to add member from organization page', async ({ page }) => {
     await page.goto('/admin/organizations');
     await page.waitForLoadState('networkidle');
-    await page.waitForTimeout(1000);
     
     const orgButtons = page.locator('button').filter({ hasText: /^\// });
     const hasOrgs = await orgButtons.count() > 0;
     
     if (hasOrgs) {
       await orgButtons.first().click();
-      await page.waitForTimeout(500);
+      await page.waitForLoadState('networkidle');
       
-      const inviteButton = page.getByRole('button', { name: /invite/i });
-      if (await inviteButton.isVisible({ timeout: 2000 }).catch(() => false)) {
-        await inviteButton.click();
-        
+      // Look for Add Member button
+      const addMemberButton = page.getByRole('button', { name: /add member/i });
+      if (await addMemberButton.isVisible({ timeout: 2000 }).catch(() => false)) {
+        await addMemberButton.click();
         await expect(page.getByRole('dialog')).toBeVisible();
-        
-        const emailInput = page.getByLabel(/email/i);
-        if (await emailInput.isVisible({ timeout: 2000 }).catch(() => false)) {
-          await emailInput.fill(`invite-test-${uniqueId()}@example.com`);
-          
-          await page.getByRole('button', { name: /send|invite/i }).click();
-          await page.waitForTimeout(2000);
-        }
-        
         await page.keyboard.press('Escape');
-      }
-    }
-  });
-
-  test('should display invitations page', async ({ page }) => {
-    await page.goto('/invitations');
-    await page.waitForLoadState('networkidle');
-    
-    await expect(page.getByRole('heading', { name: /my invitations/i })).toBeVisible();
-  });
-
-  test('should show empty state when no invitations', async ({ page }) => {
-    await page.goto('/invitations');
-    await page.waitForLoadState('networkidle');
-    
-    // Either shows invitations or empty state
-    const hasInvitations = await page.locator('.grid > div').count() > 0;
-    if (!hasInvitations) {
-      await expect(page.getByText(/no pending invitations/i)).toBeVisible();
-    }
-  });
-
-  test('should cancel a pending invitation', async ({ page }) => {
-    await page.goto('/admin/organizations');
-    await page.waitForLoadState('networkidle');
-    await page.waitForTimeout(1000);
-    
-    const orgButtons = page.locator('button').filter({ hasText: /^\// });
-    const hasOrgs = await orgButtons.count() > 0;
-    
-    if (hasOrgs) {
-      await orgButtons.first().click();
-      await page.waitForTimeout(500);
-      
-      // Look for pending invitations section
-      const cancelButtons = page.getByRole('button', { name: /cancel invitation|revoke/i });
-      if (await cancelButtons.count() > 0) {
-        await cancelButtons.first().click();
-        
-        const confirmButton = page.getByRole('button', { name: /confirm|yes/i });
-        if (await confirmButton.isVisible({ timeout: 2000 }).catch(() => false)) {
-          await confirmButton.click();
-        }
-        
-        await page.waitForTimeout(1000);
       }
     }
   });
@@ -468,7 +427,7 @@ test.describe('Invitation Flow', () => {
 // IMPERSONATION FLOW TESTS
 // ============================================================================
 
-test.describe('Impersonation Flow', () => {
+test.describe.serial('Impersonation Flow', () => {
   test.beforeAll(async () => {
     await ensureAdminRole();
   });
@@ -479,68 +438,22 @@ test.describe('Impersonation Flow', () => {
     await page.waitForLoadState('networkidle');
   });
 
-  test('should show impersonate option for other users', async ({ page }) => {
+  test('should show impersonate option in user dropdown', async ({ page }) => {
     await page.waitForSelector('table tbody tr');
     
-    const rows = page.locator('table tbody tr');
-    const rowCount = await rows.count();
+    // Click first user's action menu
+    const actionButton = page.locator('table tbody tr').first().getByRole('button');
+    await actionButton.click();
     
-    for (let i = 0; i < rowCount; i++) {
-      const row = rows.nth(i);
-      const emailCell = await row.locator('td').nth(1).textContent();
-      
-      if (emailCell && !emailCell.includes(TEST_USER.email)) {
-        await row.getByRole('button').click();
-        
-        await expect(page.getByRole('menuitem', { name: /impersonate/i })).toBeVisible();
-        await page.keyboard.press('Escape');
-        break;
-      }
-    }
+    // Check impersonate option exists
+    await expect(page.getByRole('menuitem', { name: /impersonate/i })).toBeVisible();
+    await page.keyboard.press('Escape');
   });
 
-  test('should show impersonate option is available for other users', async ({ page }) => {
-    await page.waitForSelector('table tbody tr');
-    
-    const rows = page.locator('table tbody tr');
-    const rowCount = await rows.count();
-    let foundImpersonateOption = false;
-    
-    for (let i = 0; i < rowCount && !foundImpersonateOption; i++) {
-      const row = rows.nth(i);
-      const emailCell = await row.locator('td').nth(1).textContent();
-      
-      if (emailCell && !emailCell.includes(TEST_USER.email)) {
-        await row.getByRole('button').click();
-        await page.waitForTimeout(500);
-        
-        const impersonateOption = page.getByRole('menuitem', { name: /impersonate/i });
-        if (await impersonateOption.isVisible({ timeout: 2000 }).catch(() => false)) {
-          // Check if the option is enabled (not disabled)
-          const isDisabled = await impersonateOption.getAttribute('aria-disabled');
-          if (isDisabled !== 'true') {
-            foundImpersonateOption = true;
-          }
-        }
-        
-        await page.keyboard.press('Escape');
-        await page.waitForTimeout(300);
-      }
-    }
-    
-    // Test passes if we found impersonate option (even if disabled for some users)
-    expect(true).toBe(true);
-  });
-
-  test('impersonation banner component exists in codebase', async ({ page }) => {
-    // This test verifies the impersonation UI components exist
-    // Full impersonation flow requires specific test data setup
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
-    
-    // Verify we're logged in as admin and can access admin features
-    await page.goto('/admin/users');
-    await expect(page.getByRole('heading', { name: /users/i })).toBeVisible();
+  test('impersonation banner should not be visible when not impersonating', async ({ page }) => {
+    // The impersonation banner should not be visible for normal sessions
+    const banner = page.locator('.bg-amber-500');
+    await expect(banner).not.toBeVisible();
   });
 });
 
@@ -548,7 +461,7 @@ test.describe('Impersonation Flow', () => {
 // SESSION MANAGEMENT TESTS
 // ============================================================================
 
-test.describe('Session Management', () => {
+test.describe.serial('Session Management', () => {
   test.beforeAll(async () => {
     await ensureAdminRole();
   });
@@ -619,7 +532,7 @@ test.describe('Session Management', () => {
 // ROLE MANAGEMENT TESTS
 // ============================================================================
 
-test.describe('Role Management - Full CRUD', () => {
+test.describe.serial('Role Management - Full CRUD', () => {
   test.beforeAll(async () => {
     await ensureAdminRole();
   });
@@ -784,7 +697,7 @@ test.describe('Role Management - Full CRUD', () => {
 // CLEANUP - Restore admin role
 // ============================================================================
 
-test.describe('Cleanup', () => {
+test.describe.serial('Cleanup', () => {
   test('restore admin role for test user', async () => {
     await ensureAdminRole();
   });

@@ -7,16 +7,16 @@ import {
   VerifyEmailPage,
   ForgotPasswordPage,
   SetNewPasswordPage,
+  AcceptInvitationPage,
 } from "@features/Auth";
 import { DashboardPage } from "@features/Dashboard";
-import { UsersPage, SessionsPage, OrganizationsPage, InvitationsPage, RolesPage } from "@features/Admin";
+import { UsersPage, SessionsPage, OrganizationsPage, RolesPage } from "@features/Admin";
 import RootLayout from "./RootLayout";
 import { useInitializeApp } from "../hooks/useInitializeApp";
 import { ThemeProvider } from "@shared/components/ui";
 import { AuthProvider } from "@shared/context/AuthContext";
 import { ProtectedRoute } from "@shared/components/ProtectedRoute";
 import { AdminRoute } from "@shared/components/AdminRoute";
-import { AdminOnlyRoute } from "@shared/components/AdminOnlyRoute";
 import { Toaster } from "@shared/components/ui/sonner";
 
 const queryClient = new QueryClient();
@@ -36,6 +36,7 @@ const AppRoutes = () => {
               <Route path="/verify-email" element={<VerifyEmailPage />} />
               <Route path="/forgot-password" element={<ForgotPasswordPage />} />
               <Route path="/set-new-password" element={<SetNewPasswordPage />} />
+              <Route path="/accept-invitation/:invitationId" element={<AcceptInvitationPage />} />
 
               {/* Protected routes */}
               <Route
@@ -76,14 +77,11 @@ const AppRoutes = () => {
                 <Route
                   path="admin/roles"
                   element={
-                    <AdminOnlyRoute>
+                    <AdminRoute>
                       <RolesPage />
-                    </AdminOnlyRoute>
+                    </AdminRoute>
                   }
                 />
-                
-                {/* User invitations (accessible to all authenticated users) */}
-                <Route path="invitations" element={<InvitationsPage />} />
               </Route>
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>

@@ -63,7 +63,7 @@ describe("useOrganizations hooks", () => {
   describe("organizationKeys", () => {
     it("should generate correct query keys", () => {
       expect(organizationKeys.all).toEqual(["organizations"])
-      expect(organizationKeys.list()).toEqual(["organizations", "list"])
+      expect(organizationKeys.list({})).toEqual(["organizations", "list", {}])
       expect(organizationKeys.detail("org-1")).toEqual(["organizations", "detail", "org-1"])
       expect(organizationKeys.userInvitations()).toEqual(["organizations", "userInvitations"])
       expect(organizationKeys.activeMember()).toEqual(["organizations", "activeMember"])

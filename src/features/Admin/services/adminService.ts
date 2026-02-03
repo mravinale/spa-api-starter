@@ -14,6 +14,29 @@ import type {
 const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
 
 /**
+ * Organization roles metadata type
+ */
+export type OrgRolesMetadata = {
+    roles: Array<{ name: string; displayName: string; description: string | null; color: string | null; isSystem: boolean }>;
+    assignableRoles: string[];
+};
+
+/**
+ * Get organization roles metadata (Better Auth organization roles).
+ * Exported separately to fix TypeScript type inference for large object literals.
+ */
+export async function getOrganizationRolesMetadata(): Promise<OrgRolesMetadata> {
+    const response = await fetch(`${API_BASE_URL}/api/platform-admin/organizations/roles-metadata`, {
+        credentials: "include",
+    });
+    if (!response.ok) {
+        const error = await response.json().catch(() => ({}));
+        throw new Error(error.message || "Failed to get organization roles metadata");
+    }
+    return await response.json();
+}
+
+/**
  * Admin service for user management operations.
  * Wraps Better Auth admin client methods.
  */
@@ -89,6 +112,23 @@ export const adminService = {
             const error = await response.json().catch(() => ({}));
             throw new Error(error.message || "Failed to remove user");
         }
+    },
+
+    /**
+     * Bulk remove (delete) multiple users.
+     */
+    async removeUsers(userIds: string[]): Promise<{ success: boolean; deletedCount: number }> {
+        const response = await fetch(`${API_BASE_URL}/api/admin/users/bulk-delete`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            credentials: "include",
+            body: JSON.stringify({ userIds }),
+        });
+        if (!response.ok) {
+            const error = await response.json().catch(() => ({}));
+            throw new Error(error.message || "Failed to remove users");
+        }
+        return await response.json();
     },
 
     /**
@@ -280,20 +320,48 @@ export const adminService = {
 
 /**
  * Organization service for organization management operations.
- * Wraps Better Auth organization client methods.
+ * Uses platform-admin endpoints for admin access to all organizations.
  */
+export interface OrganizationFilterParams {
+    page?: number;
+    limit?: number;
+    search?: string;
+}
+
+export interface PaginatedOrganizationsResponse {
+    data: Array<{
+        id: string;
+        name: string;
+        slug: string;
+        logo?: string | null;
+        createdAt: Date;
+        metadata?: unknown;
+        memberCount: number;
+    }>;
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+}
+
 export const organizationService = {
     /**
-     * List all organizations for the current user.
+     * List all organizations with pagination (admin view).
      */
-    async listOrganizations() {
-        const { data, error } = await organization.list();
+    async listOrganizations(params: OrganizationFilterParams = {}): Promise<PaginatedOrganizationsResponse> {
+        const url = new URL(`${API_BASE_URL}/api/platform-admin/organizations`);
+        if (params.page) url.searchParams.set("page", String(params.page));
+        if (params.limit) url.searchParams.set("limit", String(params.limit));
+        if (params.search) url.searchParams.set("search", params.search);
 
-        if (error) {
+        const response = await fetch(url.toString(), {
+            credentials: "include",
+        });
+        if (!response.ok) {
+            const error = await response.json().catch(() => ({}));
             throw new Error(error.message || "Failed to list organizations");
         }
-
-        return data ?? [];
+        return await response.json();
     },
 
     /**
@@ -346,29 +414,50 @@ export const organizationService = {
     },
 
     /**
-     * Delete an organization.
+     * Delete an organization (admin - can delete any organization).
      */
     async deleteOrganization(organizationId: string) {
-        const { error } = await organization.delete({ organizationId });
-
-        if (error) {
+        const response = await fetch(`${API_BASE_URL}/api/platform-admin/organizations/${organizationId}`, {
+            method: "DELETE",
+            credentials: "include",
+        });
+        if (!response.ok) {
+            const error = await response.json().catch(() => ({}));
             throw new Error(error.message || "Failed to delete organization");
         }
     },
 
     /**
-     * List members of an organization.
+     * List members of an organization (admin - can view any organization).
      */
     async listMembers(organizationId: string) {
-        const { data, error } = await organization.listMembers({
-            query: { organizationId },
+        const response = await fetch(`${API_BASE_URL}/api/platform-admin/organizations/${organizationId}/members`, {
+            credentials: "include",
         });
-
-        if (error) {
+        if (!response.ok) {
+            const error = await response.json().catch(() => ({}));
             throw new Error(error.message || "Failed to list members");
         }
+        const result = await response.json();
+        return result.data ?? [];
+    },
 
-        return data ?? [];
+    /**
+     * Add an existing user to an organization (admin).
+     */
+    async addMember(organizationId: string, userId: string, role: string) {
+        const response = await fetch(`${API_BASE_URL}/api/platform-admin/organizations/${organizationId}/members`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            credentials: "include",
+            body: JSON.stringify({ userId, role }),
+        });
+        if (!response.ok) {
+            const error = await response.json().catch(() => ({}));
+            throw new Error(error.message || "Failed to add member");
+        }
+        const result = await response.json();
+        return result.data;
     },
 
     /**
@@ -418,18 +507,18 @@ export const organizationService = {
     },
 
     /**
-     * List invitations for an organization.
+     * List invitations for an organization (admin - can view any organization).
      */
     async listInvitations(organizationId: string) {
-        const { data, error } = await organization.listInvitations({
-            query: { organizationId },
+        const response = await fetch(`${API_BASE_URL}/api/platform-admin/organizations/${organizationId}/invitations`, {
+            credentials: "include",
         });
-
-        if (error) {
+        if (!response.ok) {
+            const error = await response.json().catch(() => ({}));
             throw new Error(error.message || "Failed to list invitations");
         }
-
-        return data ?? [];
+        const result = await response.json();
+        return result.data ?? [];
     },
 
     /**
@@ -440,6 +529,20 @@ export const organizationService = {
 
         if (error) {
             throw new Error(error.message || "Failed to cancel invitation");
+        }
+    },
+
+    /**
+     * Delete an invitation (admin - can delete any invitation).
+     */
+    async deleteInvitation(organizationId: string, invitationId: string) {
+        const response = await fetch(`${API_BASE_URL}/api/platform-admin/organizations/${organizationId}/invitations/${invitationId}`, {
+            method: "DELETE",
+            credentials: "include",
+        });
+        if (!response.ok) {
+            const error = await response.json().catch(() => ({}));
+            throw new Error(error.message || "Failed to delete invitation");
         }
     },
 

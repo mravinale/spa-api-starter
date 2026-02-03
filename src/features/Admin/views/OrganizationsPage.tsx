@@ -1,16 +1,14 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import {
   IconDotsVertical,
   IconPlus,
   IconTrash,
   IconEdit,
   IconUsers,
-  IconMail,
 } from "@tabler/icons-react"
 import { toast } from "sonner"
 
 import { Button } from "@/shared/components/ui/button"
-import { Badge } from "@/shared/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/shared/components/ui/avatar"
 import {
   DropdownMenu,
@@ -42,16 +40,16 @@ import { Skeleton } from "@/shared/components/ui/skeleton"
 import {
   useOrganizations,
   useOrganizationMembers,
-  useOrganizationInvitations,
   useCreateOrganization,
   useUpdateOrganization,
   useDeleteOrganization,
-  useInviteMember,
   useRemoveMember,
   useUpdateMemberRole,
-  useCancelInvitation,
+  useAddMember,
   useCheckSlug,
 } from "../hooks/useOrganizations"
+import { adminService } from "../services/adminService"
+import { getOrganizationRolesMetadata } from "../services/adminService"
 
 interface Organization {
   id: string
@@ -74,12 +72,11 @@ interface Member {
   }
 }
 
-interface Invitation {
+interface User {
   id: string
+  name: string
   email: string
-  role: string
-  status: string
-  expiresAt: Date
+  image?: string | null
 }
 
 // Helper to extract members array from response
@@ -92,15 +89,6 @@ const getMembersArray = (data: unknown): Member[] => {
   return []
 }
 
-// Helper to extract invitations array from response
-const getInvitationsArray = (data: unknown): Invitation[] => {
-  if (!data) return []
-  if (Array.isArray(data)) return data as Invitation[]
-  if (typeof data === "object" && "invitations" in data) {
-    return (data as { invitations: Invitation[] }).invitations
-  }
-  return []
-}
 
 export function OrganizationsPage() {
   // State
@@ -108,34 +96,60 @@ export function OrganizationsPage() {
   const [createDialogOpen, setCreateDialogOpen] = useState(false)
   const [editDialogOpen, setEditDialogOpen] = useState(false)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
-  const [inviteDialogOpen, setInviteDialogOpen] = useState(false)
+  const [addMemberDialogOpen, setAddMemberDialogOpen] = useState(false)
   const [removeMemberDialogOpen, setRemoveMemberDialogOpen] = useState(false)
   const [selectedMember, setSelectedMember] = useState<Member | null>(null)
+
+  // Pagination state
+  const [page, setPage] = useState(1)
+  const [search, setSearch] = useState("")
+  const pageSize = 10
 
   // Form state
   const [newOrgData, setNewOrgData] = useState({ name: "", slug: "" })
   const [editOrgData, setEditOrgData] = useState({ name: "", slug: "" })
-  const [inviteData, setInviteData] = useState({ email: "", role: "member" })
+  const [addMemberData, setAddMemberData] = useState({ userId: "", role: "member" })
+  const [availableUsers, setAvailableUsers] = useState<User[]>([])
+  const [usersLoading, setUsersLoading] = useState(false)
   const [slugStatus, setSlugStatus] = useState<"idle" | "checking" | "available" | "taken">("idle")
 
+  // Organization roles metadata (fetched from backend)
+  const [orgRolesMeta, setOrgRolesMeta] = useState<{
+    roles: Array<{ name: string; displayName: string; description: string | null; color: string | null; isSystem: boolean }>;
+    assignableRoles: string[];
+  } | null>(null)
+
   // Queries
-  const { data: organizations, isLoading: orgsLoading } = useOrganizations()
+  const { data: orgsResponse, isLoading: orgsLoading } = useOrganizations({ page, limit: pageSize, search: search || undefined })
   const { data: membersData, isLoading: membersLoading } = useOrganizationMembers(selectedOrg?.id ?? "")
-  const { data: invitationsData, isLoading: invitationsLoading } = useOrganizationInvitations(selectedOrg?.id ?? "")
 
   // Extract arrays from response data
+  const organizations = orgsResponse?.data ?? []
+  const totalPages = orgsResponse?.totalPages ?? 1
+  const total = orgsResponse?.total ?? 0
   const members = getMembersArray(membersData)
-  const invitations = getInvitationsArray(invitationsData)
 
   // Mutations
   const createOrg = useCreateOrganization()
   const updateOrg = useUpdateOrganization()
   const deleteOrg = useDeleteOrganization()
-  const inviteMember = useInviteMember()
+  const addMember = useAddMember()
   const removeMember = useRemoveMember()
   const updateMemberRole = useUpdateMemberRole()
-  const cancelInvitation = useCancelInvitation()
   const checkSlug = useCheckSlug()
+
+  // Fetch organization roles metadata on mount
+  useEffect(() => {
+    const fetchRolesMeta = async () => {
+      try {
+        const meta = await getOrganizationRolesMetadata()
+        setOrgRolesMeta(meta)
+      } catch (error) {
+        console.error("Failed to fetch organization roles metadata:", error)
+      }
+    }
+    fetchRolesMeta()
+  }, [])
 
   // Check slug availability with debounce
   const handleSlugChange = async (slug: string) => {
@@ -198,19 +212,35 @@ export function OrganizationsPage() {
     }
   }
 
-  const handleInviteMember = async () => {
-    if (!selectedOrg) return
+  const handleOpenAddMemberDialog = async () => {
+    setUsersLoading(true)
     try {
-      await inviteMember.mutateAsync({
-        organizationId: selectedOrg.id,
-        email: inviteData.email,
-        role: inviteData.role,
-      })
-      toast.success("Invitation sent successfully")
-      setInviteDialogOpen(false)
-      setInviteData({ email: "", role: "member" })
+      const response = await adminService.listUsers({ limit: 100 })
+      // Filter out users who are already members
+      const memberUserIds = members.map(m => m.userId)
+      const filtered = response.data.filter((u: User) => !memberUserIds.includes(u.id))
+      setAvailableUsers(filtered)
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to send invitation")
+      toast.error("Failed to load users")
+    } finally {
+      setUsersLoading(false)
+    }
+    setAddMemberDialogOpen(true)
+  }
+
+  const handleAddMember = async () => {
+    if (!selectedOrg || !addMemberData.userId) return
+    try {
+      await addMember.mutateAsync({
+        organizationId: selectedOrg.id,
+        userId: addMemberData.userId,
+        role: addMemberData.role,
+      })
+      toast.success("Member added successfully")
+      setAddMemberDialogOpen(false)
+      setAddMemberData({ userId: "", role: "member" })
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to add member")
     }
   }
 
@@ -243,16 +273,6 @@ export function OrganizationsPage() {
     }
   }
 
-  const handleCancelInvitation = async (invitationId: string) => {
-    if (!selectedOrg) return
-    try {
-      await cancelInvitation.mutateAsync({ invitationId, organizationId: selectedOrg.id })
-      toast.success("Invitation cancelled")
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to cancel invitation")
-    }
-  }
-
   const openEditDialog = (org: Organization) => {
     setEditOrgData({ name: org.name, slug: org.slug })
     setEditDialogOpen(true)
@@ -275,11 +295,20 @@ export function OrganizationsPage() {
         {/* Organizations List */}
         <Card className="lg:col-span-1">
           <CardHeader>
-            <CardTitle>Organizations</CardTitle>
+            <CardTitle>Organizations ({total})</CardTitle>
             <CardDescription>Select an organization to manage</CardDescription>
           </CardHeader>
-          <CardContent>
-            <div className="space-y-2 max-h-[600px] overflow-y-auto">
+          <CardContent className="space-y-4">
+            {/* Search */}
+            <Input
+              placeholder="Search organizations..."
+              value={search}
+              onChange={(e) => {
+                setSearch(e.target.value)
+                setPage(1)
+              }}
+            />
+            <div className="space-y-2 max-h-[450px] overflow-y-auto">
               {orgsLoading ? (
                 Array.from({ length: 3 }).map((_, i) => (
                   <Skeleton key={i} className="h-16 w-full" />
@@ -335,6 +364,32 @@ export function OrganizationsPage() {
                 </div>
               )}
             </div>
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between pt-2 border-t">
+                <span className="text-sm text-muted-foreground">
+                  Page {page} of {totalPages}
+                </span>
+                <div className="flex gap-1">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                    disabled={page === 1}
+                  >
+                    Previous
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                    disabled={page === totalPages}
+                  >
+                    Next
+                  </Button>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -346,13 +401,13 @@ export function OrganizationsPage() {
                 {selectedOrg ? selectedOrg.name : "Organization Details"}
               </CardTitle>
               <CardDescription>
-                {selectedOrg ? `Manage members and invitations` : "Select an organization"}
+                {selectedOrg ? `Manage members` : "Select an organization"}
               </CardDescription>
             </div>
             {selectedOrg && (
-              <Button onClick={() => setInviteDialogOpen(true)}>
-                <IconMail className="mr-2 h-4 w-4" />
-                Invite Member
+              <Button onClick={handleOpenAddMemberDialog}>
+                <IconUsers className="mr-2 h-4 w-4" />
+                Add Member
               </Button>
             )}
           </CardHeader>
@@ -413,10 +468,14 @@ export function OrganizationsPage() {
                                     <SelectValue />
                                   </SelectTrigger>
                                   <SelectContent>
-                                    {/* Better Auth organization roles: owner, admin, member */}
-                                    <SelectItem value="owner">Owner</SelectItem>
-                                    <SelectItem value="admin">Admin</SelectItem>
-                                    <SelectItem value="member">Member</SelectItem>
+                                    {orgRolesMeta?.assignableRoles.map((roleName) => {
+                                      const role = orgRolesMeta.roles.find((r) => r.name === roleName)
+                                      return (
+                                        <SelectItem key={roleName} value={roleName}>
+                                          {role?.displayName || roleName}
+                                        </SelectItem>
+                                      )
+                                    }) || <SelectItem value="" disabled>Loading...</SelectItem>}
                                   </SelectContent>
                                 </Select>
                               </td>
@@ -445,62 +504,6 @@ export function OrganizationsPage() {
                   )}
                 </div>
 
-                {/* Invitations Section */}
-                <div>
-                  <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
-                    <IconMail className="h-5 w-5" />
-                    Pending Invitations ({invitations.length})
-                  </h3>
-                  {invitationsLoading ? (
-                    <Skeleton className="h-24 w-full" />
-                  ) : invitations.length ? (
-                    <div className="rounded-lg border">
-                      <table className="w-full">
-                        <thead className="bg-muted">
-                          <tr>
-                            <th className="text-left p-3 font-medium">Email</th>
-                            <th className="text-left p-3 font-medium">Role</th>
-                            <th className="text-left p-3 font-medium">Status</th>
-                            <th className="text-right p-3 font-medium">Actions</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {invitations.map((invitation) => (
-                            <tr key={invitation.id} className="border-t">
-                              <td className="p-3">{invitation.email}</td>
-                              <td className="p-3">
-                                <Badge variant="secondary">{invitation.role}</Badge>
-                              </td>
-                              <td className="p-3">
-                                <Badge
-                                  variant={invitation.status === "pending" ? "outline" : "default"}
-                                >
-                                  {invitation.status}
-                                </Badge>
-                              </td>
-                              <td className="p-3 text-right">
-                                {invitation.status === "pending" && (
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="text-destructive hover:text-destructive"
-                                    onClick={() => handleCancelInvitation(invitation.id)}
-                                  >
-                                    Cancel
-                                  </Button>
-                                )}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  ) : (
-                    <div className="text-center py-6 text-muted-foreground border rounded-lg">
-                      No pending invitations
-                    </div>
-                  )}
-                </div>
               </div>
             )}
           </CardContent>
@@ -625,52 +628,65 @@ export function OrganizationsPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Invite Member Dialog */}
-      <Dialog open={inviteDialogOpen} onOpenChange={setInviteDialogOpen}>
+      {/* Add Member Dialog */}
+      <Dialog open={addMemberDialogOpen} onOpenChange={setAddMemberDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Invite Member</DialogTitle>
+            <DialogTitle>Add Member</DialogTitle>
             <DialogDescription>
-              Send an invitation to join {selectedOrg?.name}.
+              Add an existing user to {selectedOrg?.name}.
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
             <div className="grid gap-2">
-              <Label htmlFor="invite-email">Email</Label>
-              <Input
-                id="invite-email"
-                type="email"
-                value={inviteData.email}
-                onChange={(e) => setInviteData({ ...inviteData, email: e.target.value })}
-                placeholder="user@example.com"
-              />
+              <Label htmlFor="add-member-user">User</Label>
+              <Select
+                value={addMemberData.userId}
+                onValueChange={(value) => setAddMemberData({ ...addMemberData, userId: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder={usersLoading ? "Loading users..." : "Select a user"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableUsers.map((user) => (
+                    <SelectItem key={user.id} value={user.id}>
+                      {user.name} ({user.email})
+                    </SelectItem>
+                  ))}
+                  {availableUsers.length === 0 && !usersLoading && (
+                    <SelectItem value="" disabled>No users available</SelectItem>
+                  )}
+                </SelectContent>
+              </Select>
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="invite-role">Role</Label>
+              <Label htmlFor="add-member-role">Role</Label>
               <Select
-                value={inviteData.role}
-                onValueChange={(value) => setInviteData({ ...inviteData, role: value })}
+                value={addMemberData.role}
+                onValueChange={(value) => setAddMemberData({ ...addMemberData, role: value })}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select role" />
                 </SelectTrigger>
                 <SelectContent>
-                  {/* Better Auth organization roles: owner, admin, member */}
-                  <SelectItem value="admin">Admin</SelectItem>
-                  <SelectItem value="member">Member</SelectItem>
+                  {orgRolesMeta?.assignableRoles.map((roleName) => {
+                    const role = orgRolesMeta.roles.find((r) => r.name === roleName)
+                    return (
+                      <SelectItem key={roleName} value={roleName}>
+                        {role?.displayName || roleName}
+                      </SelectItem>
+                    )
+                  }) || <SelectItem value="" disabled>Loading...</SelectItem>}
                 </SelectContent>
               </Select>
-              <p className="text-sm text-muted-foreground">
-                Admin can manage members. Member has basic access.
-              </p>
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setInviteDialogOpen(false)}>
+            <Button variant="outline" onClick={() => setAddMemberDialogOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={handleInviteMember} disabled={inviteMember.isPending}>
-              {inviteMember.isPending ? "Sending..." : "Send Invitation"}
+            <Button onClick={handleAddMember} disabled={addMember.isPending || !addMemberData.userId}>
+              {addMember.isPending ? "Adding..." : "Add Member"}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -51,8 +51,10 @@ import {
   useSetUserRole,
   useSetUserPassword,
   useRemoveUser,
+  useRemoveUsers,
   useImpersonateUser,
 } from "../hooks/useUsers"
+import { Checkbox } from "@/shared/components/ui/checkbox"
 import { useAuth } from "@/shared/context/AuthContext"
 import type { AdminUser, UserFilterParams } from "../types"
 import { adminService } from "../services/adminService"
@@ -73,7 +75,9 @@ export function UsersPage() {
   const [roleDialogOpen, setRoleDialogOpen] = useState(false)
   const [passwordDialogOpen, setPasswordDialogOpen] = useState(false)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [bulkDeleteDialogOpen, setBulkDeleteDialogOpen] = useState(false)
   const [selectedUser, setSelectedUser] = useState<AdminUser | null>(null)
+  const [selectedUsers, setSelectedUsers] = useState<AdminUser[]>([])
 
   // Form states
   const [newUserData, setNewUserData] = useState<{ name: string; email: string; password: string; role: 'admin' | 'manager' | 'member'; organizationId?: string }>({ name: "", email: "", password: "", role: "member" })
@@ -117,6 +121,7 @@ export function UsersPage() {
   const setUserRole = useSetUserRole()
   const setUserPassword = useSetUserPassword()
   const removeUser = useRemoveUser()
+  const removeUsers = useRemoveUsers()
   const impersonateUser = useImpersonateUser()
 
   // Handlers
@@ -247,6 +252,19 @@ export function UsersPage() {
     }
   }
 
+  const handleBulkDeleteUsers = async () => {
+    if (selectedUsers.length === 0) return
+    try {
+      const userIds = selectedUsers.map((u) => u.id)
+      await removeUsers.mutateAsync(userIds)
+      toast.success(`${selectedUsers.length} user(s) deleted successfully`)
+      setBulkDeleteDialogOpen(false)
+      setSelectedUsers([])
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to delete users")
+    }
+  }
+
   const handleImpersonateUser = async (user: AdminUser) => {
     // Don't allow impersonating yourself
     if (user.id === currentUser?.id) {
@@ -265,6 +283,25 @@ export function UsersPage() {
 
   // Table columns
   const columns: ColumnDef<AdminUser>[] = useMemo(() => [
+    {
+      id: "select",
+      header: ({ table }) => (
+        <Checkbox
+          checked={table.getIsAllPageRowsSelected() || (table.getIsSomePageRowsSelected() && "indeterminate")}
+          onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
+          aria-label="Select all"
+        />
+      ),
+      cell: ({ row }) => (
+        <Checkbox
+          checked={row.getIsSelected()}
+          onCheckedChange={(value) => row.toggleSelected(!!value)}
+          aria-label="Select row"
+        />
+      ),
+      enableSorting: false,
+      enableHiding: false,
+    },
     {
       accessorKey: "name",
       header: "User",
@@ -438,11 +475,25 @@ export function UsersPage() {
           setPageSize(size)
           setPageIndex(0)
         }}
+        enableRowSelection
+        getRowId={(row) => row.id}
+        onRowSelectionChange={setSelectedUsers}
         toolbar={
-          <Button onClick={() => setCreateDialogOpen(true)}>
-            <IconPlus className="mr-2 h-4 w-4" />
-            Add User
-          </Button>
+          <div className="flex items-center gap-2">
+            {selectedUsers.length > 0 && (
+              <Button
+                variant="destructive"
+                onClick={() => setBulkDeleteDialogOpen(true)}
+              >
+                <IconTrash className="mr-2 h-4 w-4" />
+                Delete ({selectedUsers.length})
+              </Button>
+            )}
+            <Button onClick={() => handleOpenCreateDialog(true)}>
+              <IconPlus className="mr-2 h-4 w-4" />
+              Add User
+            </Button>
+          </div>
         }
       />
 
@@ -691,6 +742,26 @@ export function UsersPage() {
             </Button>
             <Button variant="destructive" onClick={handleDeleteUser} disabled={removeUser.isPending}>
               {removeUser.isPending ? "Deleting..." : "Delete User"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Bulk Delete Users Dialog */}
+      <Dialog open={bulkDeleteDialogOpen} onOpenChange={setBulkDeleteDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete {selectedUsers.length} User(s)</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete {selectedUsers.length} selected user(s)? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setBulkDeleteDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={handleBulkDeleteUsers} disabled={removeUsers.isPending}>
+              {removeUsers.isPending ? "Deleting..." : `Delete ${selectedUsers.length} User(s)`}
             </Button>
           </DialogFooter>
         </DialogContent>

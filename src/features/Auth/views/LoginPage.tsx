@@ -29,7 +29,17 @@ export default function LoginPage() {
     // Redirect if already authenticated
     useEffect(() => {
         if (isAuthenticated) {
-            navigate("/", { replace: true });
+            // Check for pending invitation
+            const pendingInvitationId = sessionStorage.getItem("pendingInvitationId");
+            console.log("LoginPage: isAuthenticated, pendingInvitationId:", pendingInvitationId);
+            if (pendingInvitationId) {
+                sessionStorage.removeItem("pendingInvitationId");
+                console.log("LoginPage: Redirecting to accept-invitation:", pendingInvitationId);
+                navigate(`/accept-invitation/${pendingInvitationId}`, { replace: true });
+            } else {
+                console.log("LoginPage: No pending invitation, redirecting to dashboard");
+                navigate("/", { replace: true });
+            }
         }
     }, [isAuthenticated, navigate]);
 

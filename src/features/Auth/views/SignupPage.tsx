@@ -41,7 +41,14 @@ export default function SignupPage() {
         try {
             await signup({ name, email, password });
             toast.success("Account created successfully!");
-            navigate("/");
+            // Check for pending invitation
+            const pendingInvitationId = sessionStorage.getItem("pendingInvitationId");
+            if (pendingInvitationId) {
+                sessionStorage.removeItem("pendingInvitationId");
+                navigate(`/accept-invitation/${pendingInvitationId}`, { replace: true });
+            } else {
+                navigate("/");
+            }
         } catch (error) {
             const message = error instanceof Error ? error.message : "Signup failed";
             toast.error(message);

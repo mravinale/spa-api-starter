@@ -2,6 +2,7 @@ import { Outlet } from "react-router-dom";
 import { SidebarInset, SidebarProvider } from "@/shared/components/ui/sidebar";
 import { AppSidebar } from "@/shared/components/ui/app-sidebar";
 import { SiteHeader } from "@/shared/components/ui/site-header";
+import { ImpersonationBanner } from "@/shared/components/ImpersonationBanner";
 
 const RootLayout = () => {
   return (
@@ -15,6 +16,7 @@ const RootLayout = () => {
     >
       <AppSidebar variant="inset" />
       <SidebarInset>
+        <ImpersonationBanner />
         <SiteHeader />
         <div className="flex flex-1 flex-col">
           <Outlet />

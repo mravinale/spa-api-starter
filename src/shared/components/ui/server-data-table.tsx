@@ -61,6 +61,9 @@ interface ServerDataTableProps<TData, TValue> {
   onSortingChange?: (sorting: SortingState) => void
   sorting?: SortingState
   toolbar?: React.ReactNode
+  enableRowSelection?: boolean
+  onRowSelectionChange?: (selectedRows: TData[]) => void
+  getRowId?: (row: TData) => string
 }
 
 export function ServerDataTable<TData, TValue>({
@@ -78,6 +81,9 @@ export function ServerDataTable<TData, TValue>({
   onSortingChange,
   sorting = [],
   toolbar,
+  enableRowSelection = false,
+  onRowSelectionChange,
+  getRowId,
 }: ServerDataTableProps<TData, TValue>) {
   const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({})
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([])
@@ -89,6 +95,7 @@ export function ServerDataTable<TData, TValue>({
     data,
     columns,
     pageCount,
+    getRowId,
     state: {
       sorting,
       columnVisibility,
@@ -101,8 +108,21 @@ export function ServerDataTable<TData, TValue>({
     },
     manualPagination: true,
     manualSorting: true,
-    enableRowSelection: true,
-    onRowSelectionChange: setRowSelection,
+    enableRowSelection,
+    onRowSelectionChange: (updater) => {
+      const newSelection = typeof updater === "function" ? updater(rowSelection) : updater
+      setRowSelection(newSelection)
+      if (onRowSelectionChange) {
+        const selectedRows = Object.keys(newSelection)
+          .filter((key) => newSelection[key as keyof typeof newSelection])
+          .map((key) => {
+            const row = table.getRow(key)
+            return row?.original
+          })
+          .filter(Boolean) as TData[]
+        onRowSelectionChange(selectedRows)
+      }
+    },
     onSortingChange: (updater) => {
       const newSorting = typeof updater === "function" ? updater(sorting) : updater
       onSortingChange?.(newSorting)

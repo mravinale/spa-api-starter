@@ -1,11 +1,11 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { organizationService } from "../services/adminService";
+import { organizationService, type OrganizationFilterParams } from "../services/adminService";
 
 // Query keys
 export const organizationKeys = {
     all: ["organizations"] as const,
     lists: () => [...organizationKeys.all, "list"] as const,
-    list: () => [...organizationKeys.lists()] as const,
+    list: (params: OrganizationFilterParams) => [...organizationKeys.lists(), params] as const,
     details: () => [...organizationKeys.all, "detail"] as const,
     detail: (id: string) => [...organizationKeys.details(), id] as const,
     members: (orgId: string) => [...organizationKeys.all, "members", orgId] as const,
@@ -15,12 +15,12 @@ export const organizationKeys = {
 };
 
 /**
- * Hook to fetch list of organizations.
+ * Hook to fetch list of organizations with pagination.
  */
-export function useOrganizations() {
+export function useOrganizations(params: OrganizationFilterParams = {}) {
     return useQuery({
-        queryKey: organizationKeys.list(),
-        queryFn: () => organizationService.listOrganizations(),
+        queryKey: organizationKeys.list(params),
+        queryFn: () => organizationService.listOrganizations(params),
     });
 }
 
@@ -148,16 +148,16 @@ export function useUpdateMemberRole() {
 }
 
 /**
- * Hook to cancel an invitation.
+ * Hook to add an existing user to an organization (admin).
  */
-export function useCancelInvitation() {
+export function useAddMember() {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: (params: { invitationId: string; organizationId: string }) =>
-            organizationService.cancelInvitation(params.invitationId),
+        mutationFn: (params: { organizationId: string; userId: string; role: string }) =>
+            organizationService.addMember(params.organizationId, params.userId, params.role),
         onSuccess: (_, variables) => {
-            queryClient.invalidateQueries({ queryKey: organizationKeys.invitations(variables.organizationId) });
+            queryClient.invalidateQueries({ queryKey: organizationKeys.members(variables.organizationId) });
         },
     });
 }

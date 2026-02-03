@@ -3,10 +3,11 @@ import { defineConfig, devices } from '@playwright/test';
 export default defineConfig({
   testDir: './e2e',
   globalSetup: './e2e/global-setup.ts',
-  fullyParallel: true,
+  globalTeardown: './e2e/global-teardown.ts',
+  fullyParallel: false, // Disable parallel to avoid race conditions with shared test user
   forbidOnly: !!process.env.CI,
-  retries: process.env.CI ? 2 : 0,
-  workers: process.env.CI ? 1 : undefined,
+  retries: 0, // No retries - tests should be deterministic
+  workers: 1, // Single worker to ensure test isolation
   reporter: 'html',
   use: {
     baseURL: 'http://localhost:5173',
