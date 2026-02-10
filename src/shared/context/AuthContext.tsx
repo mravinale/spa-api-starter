@@ -64,6 +64,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (result.error) {
             throw new Error(result.error.message || "Login failed");
         }
+
+        // Refresh session to update isAuthenticated state
+        await refetch();
     };
 
     const signup = async (credentials: SignupCredentials) => {
