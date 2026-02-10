@@ -460,24 +460,36 @@ export function OrganizationsPage() {
                                 </div>
                               </td>
                               <td className="p-3">
-                                <Select
-                                  value={member.role}
-                                  onValueChange={(value) => handleUpdateRole(member.id, value)}
-                                >
-                                  <SelectTrigger className="w-32">
-                                    <SelectValue />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    {orgRolesMeta?.assignableRoles.map((roleName) => {
-                                      const role = orgRolesMeta.roles.find((r) => r.name === roleName)
-                                      return (
-                                        <SelectItem key={roleName} value={roleName}>
-                                          {role?.displayName || roleName}
-                                        </SelectItem>
-                                      )
-                                    }) || <SelectItem value="" disabled>Loading...</SelectItem>}
-                                  </SelectContent>
-                                </Select>
+                                {(() => {
+                                  const isOwner = member.role === "owner"
+                                  const isOnlyOwner = isOwner && members.filter(m => m.role === "owner").length === 1
+                                  // Build role options: include current role even if not in assignableRoles
+                                  const assignable = orgRolesMeta?.assignableRoles ?? []
+                                  const allRoleOptions = assignable.includes(member.role)
+                                    ? assignable
+                                    : [member.role, ...assignable]
+                                  return (
+                                    <Select
+                                      value={member.role || undefined}
+                                      onValueChange={(value) => handleUpdateRole(member.id, value)}
+                                      disabled={isOnlyOwner}
+                                    >
+                                      <SelectTrigger className="w-32">
+                                        <SelectValue placeholder="Select role" />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        {allRoleOptions.map((roleName) => {
+                                          const role = orgRolesMeta?.roles.find((r) => r.name === roleName)
+                                          return (
+                                            <SelectItem key={roleName} value={roleName}>
+                                              {role?.displayName || roleName.charAt(0).toUpperCase() + roleName.slice(1)}
+                                            </SelectItem>
+                                          )
+                                        })}
+                                      </SelectContent>
+                                    </Select>
+                                  )
+                                })()}
                               </td>
                               <td className="p-3 text-right">
                                 <Button
@@ -641,7 +653,7 @@ export function OrganizationsPage() {
             <div className="grid gap-2">
               <Label htmlFor="add-member-user">User</Label>
               <Select
-                value={addMemberData.userId}
+                value={addMemberData.userId || undefined}
                 onValueChange={(value) => setAddMemberData({ ...addMemberData, userId: value })}
               >
                 <SelectTrigger>
@@ -654,7 +666,7 @@ export function OrganizationsPage() {
                     </SelectItem>
                   ))}
                   {availableUsers.length === 0 && !usersLoading && (
-                    <SelectItem value="" disabled>No users available</SelectItem>
+                    <SelectItem value="__no_users__" disabled>No users available</SelectItem>
                   )}
                 </SelectContent>
               </Select>
@@ -662,7 +674,7 @@ export function OrganizationsPage() {
             <div className="grid gap-2">
               <Label htmlFor="add-member-role">Role</Label>
               <Select
-                value={addMemberData.role}
+                value={addMemberData.role || undefined}
                 onValueChange={(value) => setAddMemberData({ ...addMemberData, role: value })}
               >
                 <SelectTrigger>
@@ -676,7 +688,7 @@ export function OrganizationsPage() {
                         {role?.displayName || roleName}
                       </SelectItem>
                     )
-                  }) || <SelectItem value="" disabled>Loading...</SelectItem>}
+                  }) || <SelectItem value="__loading__" disabled>Loading...</SelectItem>}
                 </SelectContent>
               </Select>
             </div>
