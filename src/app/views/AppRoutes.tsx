@@ -1,4 +1,4 @@
-import { HashRouter, Route, Routes, Navigate } from "react-router-dom";
+import { BrowserRouter, Route, Routes, Navigate } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import "../styles/globals.css";
 import {
@@ -26,7 +26,7 @@ const AppRoutes = () => {
 
   return (
     <ThemeProvider defaultTheme="system" storageKey="vite-ui-theme">
-      <HashRouter>
+      <BrowserRouter>
         <QueryClientProvider client={queryClient}>
           <AuthProvider>
             <Routes>
@@ -88,7 +88,7 @@ const AppRoutes = () => {
           </AuthProvider>
           <Toaster richColors position="top-right" />
         </QueryClientProvider>
-      </HashRouter>
+      </BrowserRouter>
     </ThemeProvider>
   );
 };
