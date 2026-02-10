@@ -8,6 +8,7 @@ import type {
   PermissionsGrouped,
   ApiResponse,
 } from "../types/rbac";
+import { fetchWithAuth } from "@shared/lib/fetch-with-auth";
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
 
@@ -21,9 +22,7 @@ export const rbacService = {
    * Get all roles
    */
   async getRoles(): Promise<Role[]> {
-    const response = await fetch(`${API_BASE_URL}/api/rbac/roles`, {
-      credentials: "include",
-    });
+    const response = await fetchWithAuth(`${API_BASE_URL}/api/rbac/roles`);
     if (!response.ok) {
       throw new Error("Failed to fetch roles");
     }
@@ -35,9 +34,7 @@ export const rbacService = {
    * Get role by ID with permissions
    */
   async getRole(id: string): Promise<RoleWithPermissions> {
-    const response = await fetch(`${API_BASE_URL}/api/rbac/roles/${id}`, {
-      credentials: "include",
-    });
+    const response = await fetchWithAuth(`${API_BASE_URL}/api/rbac/roles/${id}`);
     if (!response.ok) {
       throw new Error("Failed to fetch role");
     }
@@ -49,10 +46,9 @@ export const rbacService = {
    * Create a new role
    */
   async createRole(dto: CreateRoleDto): Promise<Role> {
-    const response = await fetch(`${API_BASE_URL}/api/rbac/roles`, {
+    const response = await fetchWithAuth(`${API_BASE_URL}/api/rbac/roles`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      credentials: "include",
       body: JSON.stringify(dto),
     });
     if (!response.ok) {
@@ -67,10 +63,9 @@ export const rbacService = {
    * Update a role
    */
   async updateRole(id: string, dto: UpdateRoleDto): Promise<Role> {
-    const response = await fetch(`${API_BASE_URL}/api/rbac/roles/${id}`, {
+    const response = await fetchWithAuth(`${API_BASE_URL}/api/rbac/roles/${id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      credentials: "include",
       body: JSON.stringify(dto),
     });
     if (!response.ok) {
@@ -84,9 +79,8 @@ export const rbacService = {
    * Delete a role
    */
   async deleteRole(id: string): Promise<void> {
-    const response = await fetch(`${API_BASE_URL}/api/rbac/roles/${id}`, {
+    const response = await fetchWithAuth(`${API_BASE_URL}/api/rbac/roles/${id}`, {
       method: "DELETE",
-      credentials: "include",
     });
     if (!response.ok) {
       const error = await response.json().catch(() => ({}));
@@ -98,10 +92,9 @@ export const rbacService = {
    * Assign permissions to a role
    */
   async assignPermissions(roleId: string, dto: AssignPermissionsDto): Promise<RoleWithPermissions> {
-    const response = await fetch(`${API_BASE_URL}/api/rbac/roles/${roleId}/permissions`, {
+    const response = await fetchWithAuth(`${API_BASE_URL}/api/rbac/roles/${roleId}/permissions`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      credentials: "include",
       body: JSON.stringify(dto),
     });
     if (!response.ok) {
@@ -117,9 +110,7 @@ export const rbacService = {
    * Get all permissions
    */
   async getPermissions(): Promise<Permission[]> {
-    const response = await fetch(`${API_BASE_URL}/api/rbac/permissions`, {
-      credentials: "include",
-    });
+    const response = await fetchWithAuth(`${API_BASE_URL}/api/rbac/permissions`);
     if (!response.ok) {
       throw new Error("Failed to fetch permissions");
     }
@@ -131,9 +122,7 @@ export const rbacService = {
    * Get permissions grouped by resource
    */
   async getPermissionsGrouped(): Promise<PermissionsGrouped> {
-    const response = await fetch(`${API_BASE_URL}/api/rbac/permissions/grouped`, {
-      credentials: "include",
-    });
+    const response = await fetchWithAuth(`${API_BASE_URL}/api/rbac/permissions/grouped`);
     if (!response.ok) {
       throw new Error("Failed to fetch permissions");
     }
@@ -147,9 +136,7 @@ export const rbacService = {
    * Get user's effective permissions based on role
    */
   async getUserPermissions(roleName: string): Promise<Permission[]> {
-    const response = await fetch(`${API_BASE_URL}/api/rbac/users/${roleName}/permissions`, {
-      credentials: "include",
-    });
+    const response = await fetchWithAuth(`${API_BASE_URL}/api/rbac/users/${roleName}/permissions`);
     if (!response.ok) {
       throw new Error("Failed to fetch user permissions");
     }
@@ -161,9 +148,8 @@ export const rbacService = {
    * Check if a role has a specific permission
    */
   async checkPermission(roleName: string, resource: string, action: string): Promise<boolean> {
-    const response = await fetch(
-      `${API_BASE_URL}/api/rbac/check/${roleName}/${resource}/${action}`,
-      { credentials: "include" }
+    const response = await fetchWithAuth(
+      `${API_BASE_URL}/api/rbac/check/${roleName}/${resource}/${action}`
     );
     if (!response.ok) {
       return false;
