@@ -3,6 +3,7 @@ import { useSearchParams, useNavigate, Link } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@shared/components/ui/card";
 import { Button } from "@shared/components/ui/button";
 import { IconLoader2, IconCircleCheck, IconCircleX } from "@tabler/icons-react";
+import { fetchWithAuth } from "@shared/lib/fetch-with-auth";
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
 
@@ -28,10 +29,9 @@ export function VerifyEmailPage() {
 
     const verifyEmail = async (token: string) => {
         try {
-            const response = await fetch(`${API_BASE_URL}/api/auth/verify-email`, {
+            const response = await fetchWithAuth(`${API_BASE_URL}/api/auth/verify-email`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                credentials: "include",
                 body: JSON.stringify({ token }),
             });
 

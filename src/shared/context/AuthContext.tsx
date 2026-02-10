@@ -1,6 +1,7 @@
 import React, { createContext, useContext } from "react";
 import type { User, AuthState, LoginCredentials, SignupCredentials } from "@features/Auth/types";
 import { useSession, signIn, signUp, signOut } from "@shared/lib/auth-client";
+import { fetchWithAuth } from "@shared/lib/fetch-with-auth";
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
 
@@ -83,13 +84,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const logout = async () => {
         await signOut();
+        // Clear bearer token on logout
+        localStorage.removeItem("bearer_token");
     };
 
     const forgotPassword = async (email: string) => {
-        const response = await fetch(`${API_BASE_URL}/api/auth/request-password-reset`, {
+        const response = await fetchWithAuth(`${API_BASE_URL}/api/auth/request-password-reset`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            credentials: "include",
             body: JSON.stringify({
                 email,
                 redirectTo: `${window.location.origin}/set-new-password`,
@@ -103,10 +105,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
 
     const resetPassword = async (token: string, newPassword: string) => {
-        const response = await fetch(`${API_BASE_URL}/api/auth/reset-password`, {
+        const response = await fetchWithAuth(`${API_BASE_URL}/api/auth/reset-password`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            credentials: "include",
             body: JSON.stringify({ token, newPassword }),
         });
 
@@ -117,10 +118,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
 
     const sendVerificationEmail = async (email: string) => {
-        const response = await fetch(`${API_BASE_URL}/api/auth/send-verification-email`, {
+        const response = await fetchWithAuth(`${API_BASE_URL}/api/auth/send-verification-email`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            credentials: "include",
             body: JSON.stringify({ email }),
         });
 
