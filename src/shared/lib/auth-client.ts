@@ -9,6 +9,20 @@ export const authClient = createAuthClient({
     organizationClient(),
     adminClient(),
   ],
+  fetchOptions: {
+    // Store bearer token on successful auth responses
+    onSuccess: (ctx) => {
+      const authToken = ctx.response.headers.get("set-auth-token");
+      if (authToken) {
+        localStorage.setItem("bearer_token", authToken);
+      }
+    },
+    // Send bearer token with all requests
+    auth: {
+      type: "Bearer",
+      token: () => localStorage.getItem("bearer_token") || "",
+    },
+  },
 });
 
 // Export the client for direct access
