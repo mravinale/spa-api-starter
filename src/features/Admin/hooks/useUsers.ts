@@ -180,7 +180,8 @@ export function useRevokeAllSessions() {
  */
 export function useImpersonateUser() {
     return useMutation({
-        mutationFn: (userId: string) => adminService.impersonateUser(userId),
+        mutationFn: (params: { userId: string; role?: string; organizationId?: string }) =>
+            adminService.impersonateUser(params.userId, { role: params.role, organizationId: params.organizationId }),
     });
 }
 
@@ -189,6 +190,6 @@ export function useImpersonateUser() {
  */
 export function useStopImpersonating() {
     return useMutation({
-        mutationFn: () => adminService.stopImpersonating(),
+        mutationFn: (params?: { role?: string }) => adminService.stopImpersonating(params),
     });
 }

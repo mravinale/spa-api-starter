@@ -244,23 +244,59 @@ export const adminService = {
 
     /**
      * Impersonate a user.
+     * Admin uses Better Auth's built-in endpoint.
+     * Manager uses org-scoped endpoint which validates org membership.
      */
-    async impersonateUser(userId: string): Promise<void> {
-        const { error } = await admin.impersonateUser({ userId });
+    async impersonateUser(userId: string, options?: { role?: string; organizationId?: string }): Promise<void> {
+        const role = options?.role || "admin";
+        const orgId = options?.organizationId;
 
-        if (error) {
-            throw new Error(error.message || "Failed to impersonate user");
+        if (role === "admin") {
+            const { error } = await admin.impersonateUser({ userId });
+            if (error) {
+                throw new Error(error.message || "Failed to impersonate user");
+            }
+        } else {
+            if (!orgId) {
+                throw new Error("Active organization required for manager impersonation");
+            }
+            const response = await fetchWithAuth(`${API_BASE_URL}/api/organization/${orgId}/impersonate`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ userId }),
+            });
+            if (!response.ok) {
+                const error = await response.json().catch(() => ({}));
+                throw new Error(error.message || "Failed to impersonate user");
+            }
+            const data = await response.json();
+            if (data.sessionToken) {
+                localStorage.setItem("bearer_token", data.sessionToken);
+            }
         }
     },
 
     /**
      * Stop impersonating a user.
+     * Admin uses Better Auth's built-in endpoint.
+     * Manager uses org-scoped endpoint.
      */
-    async stopImpersonating(): Promise<void> {
-        const { error } = await admin.stopImpersonating();
+    async stopImpersonating(options?: { role?: string }): Promise<void> {
+        const role = options?.role || "admin";
 
-        if (error) {
-            throw new Error(error.message || "Failed to stop impersonating");
+        if (role === "admin") {
+            const { error } = await admin.stopImpersonating();
+            if (error) {
+                throw new Error(error.message || "Failed to stop impersonating");
+            }
+        } else {
+            const response = await fetchWithAuth(`${API_BASE_URL}/api/organization/stop-impersonating`, {
+                method: "POST",
+            });
+            if (!response.ok) {
+                const error = await response.json().catch(() => ({}));
+                throw new Error(error.message || "Failed to stop impersonating");
+            }
         }
     },
 
