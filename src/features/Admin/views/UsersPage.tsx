@@ -375,6 +375,24 @@ export function UsersPage() {
       id: "actions",
       cell: ({ row }) => {
         const user = row.original
+        const myRole = currentUser?.role || "member"
+        const isSelf = user.id === currentUser?.id
+        const targetRole = user.role || "member"
+
+        // Determine allowed actions based on role hierarchy:
+        // admin → all actions on managers/members, edit-only on self, no actions on other admins
+        // manager → all actions on members, edit-only on self, no actions on admins/other managers
+        const canEditOnly = isSelf
+        const canDoFullActions = (() => {
+          if (isSelf) return false
+          if (myRole === "admin") return targetRole !== "admin"
+          if (myRole === "manager") return targetRole === "member"
+          return false
+        })()
+        const hasAnyAction = canEditOnly || canDoFullActions
+
+        if (!hasAnyAction) return null
+
         return (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -394,62 +412,76 @@ export function UsersPage() {
                 <IconEdit className="mr-2 h-4 w-4" />
                 Edit User
               </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => handleOpenRoleDialog(user)}
-              >
-                <IconShield className="mr-2 h-4 w-4" />
-                Change Role
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => {
-                  setSelectedUser(user)
-                  setPasswordDialogOpen(true)
-                }}
-              >
-                <IconKey className="mr-2 h-4 w-4" />
-                Reset Password
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => handleImpersonateUser(user)}
-                disabled={user.id === currentUser?.id}
-              >
-                <IconUserScan className="mr-2 h-4 w-4" />
-                Impersonate User
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              {user.banned ? (
-                <DropdownMenuItem onClick={() => handleUnbanUser(user)}>
-                  <IconCheck className="mr-2 h-4 w-4" />
-                  Unban User
-                </DropdownMenuItem>
-              ) : (
+              {isSelf && (myRole === "admin" || myRole === "manager") && (
                 <DropdownMenuItem
                   onClick={() => {
                     setSelectedUser(user)
-                    setBanDialogOpen(true)
+                    setPasswordDialogOpen(true)
                   }}
                 >
-                  <IconBan className="mr-2 h-4 w-4" />
-                  Ban User
+                  <IconKey className="mr-2 h-4 w-4" />
+                  Reset Password
                 </DropdownMenuItem>
               )}
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                className="text-destructive"
-                onClick={() => {
-                  setSelectedUser(user)
-                  setDeleteDialogOpen(true)
-                }}
-              >
-                <IconTrash className="mr-2 h-4 w-4" />
-                Delete User
-              </DropdownMenuItem>
+              {canDoFullActions && (
+                <>
+                  <DropdownMenuItem
+                    onClick={() => handleOpenRoleDialog(user)}
+                  >
+                    <IconShield className="mr-2 h-4 w-4" />
+                    Change Role
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => {
+                      setSelectedUser(user)
+                      setPasswordDialogOpen(true)
+                    }}
+                  >
+                    <IconKey className="mr-2 h-4 w-4" />
+                    Reset Password
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => handleImpersonateUser(user)}
+                  >
+                    <IconUserScan className="mr-2 h-4 w-4" />
+                    Impersonate User
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  {user.banned ? (
+                    <DropdownMenuItem onClick={() => handleUnbanUser(user)}>
+                      <IconCheck className="mr-2 h-4 w-4" />
+                      Unban User
+                    </DropdownMenuItem>
+                  ) : (
+                    <DropdownMenuItem
+                      onClick={() => {
+                        setSelectedUser(user)
+                        setBanDialogOpen(true)
+                      }}
+                    >
+                      <IconBan className="mr-2 h-4 w-4" />
+                      Ban User
+                    </DropdownMenuItem>
+                  )}
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    className="text-destructive"
+                    onClick={() => {
+                      setSelectedUser(user)
+                      setDeleteDialogOpen(true)
+                    }}
+                  >
+                    <IconTrash className="mr-2 h-4 w-4" />
+                    Delete User
+                  </DropdownMenuItem>
+                </>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
         )
       },
     },
-  ], [])
+  ], [currentUser])
 
   return (
     <div className="flex flex-1 flex-col gap-4 p-4 lg:p-6">
