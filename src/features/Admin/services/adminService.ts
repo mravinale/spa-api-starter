@@ -1,4 +1,5 @@
 import { admin, organization } from "@shared/lib/auth-client";
+import { fetchWithAuth } from "@shared/lib/fetch-with-auth";
 import type {
     AdminUser,
     UserSession,
@@ -26,9 +27,7 @@ export type OrgRolesMetadata = {
  * Exported separately to fix TypeScript type inference for large object literals.
  */
 export async function getOrganizationRolesMetadata(): Promise<OrgRolesMetadata> {
-    const response = await fetch(`${API_BASE_URL}/api/platform-admin/organizations/roles-metadata`, {
-        credentials: "include",
-    });
+    const response = await fetchWithAuth(`${API_BASE_URL}/api/platform-admin/organizations/roles-metadata`);
     if (!response.ok) {
         const error = await response.json().catch(() => ({}));
         throw new Error(error.message || "Failed to get organization roles metadata");
@@ -52,7 +51,7 @@ export const adminService = {
         url.searchParams.set("offset", String(params.offset ?? 0));
         if (params.searchValue) url.searchParams.set("searchValue", params.searchValue);
 
-        const response = await fetch(url.toString(), { credentials: "include" });
+        const response = await fetchWithAuth(url.toString());
         if (!response.ok) {
             const error = await response.json().catch(() => ({}));
             throw new Error(error.message || "Failed to list users");
@@ -64,10 +63,9 @@ export const adminService = {
      * Create a new user.
      */
     async createUser(params: CreateUserParams): Promise<AdminUser> {
-        const response = await fetch(`${API_BASE_URL}/api/admin/users`, {
+        const response = await fetchWithAuth(`${API_BASE_URL}/api/admin/users`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            credentials: "include",
             body: JSON.stringify({
                 email: params.email,
                 password: params.password,
@@ -87,10 +85,9 @@ export const adminService = {
      * Update a user's details.
      */
     async updateUser(params: UpdateUserParams): Promise<AdminUser> {
-        const response = await fetch(`${API_BASE_URL}/api/admin/users/${params.userId}`, {
+        const response = await fetchWithAuth(`${API_BASE_URL}/api/admin/users/${params.userId}`, {
             method: "PUT",
             headers: { "Content-Type": "application/json" },
-            credentials: "include",
             body: JSON.stringify({ name: params.data.name }),
         });
         if (!response.ok) {
@@ -104,9 +101,8 @@ export const adminService = {
      * Remove (delete) a user.
      */
     async removeUser(userId: string): Promise<void> {
-        const response = await fetch(`${API_BASE_URL}/api/admin/users/${userId}`, {
+        const response = await fetchWithAuth(`${API_BASE_URL}/api/admin/users/${userId}`, {
             method: "DELETE",
-            credentials: "include",
         });
         if (!response.ok) {
             const error = await response.json().catch(() => ({}));
@@ -118,10 +114,9 @@ export const adminService = {
      * Bulk remove (delete) multiple users.
      */
     async removeUsers(userIds: string[]): Promise<{ success: boolean; deletedCount: number }> {
-        const response = await fetch(`${API_BASE_URL}/api/admin/users/bulk-delete`, {
+        const response = await fetchWithAuth(`${API_BASE_URL}/api/admin/users/bulk-delete`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            credentials: "include",
             body: JSON.stringify({ userIds }),
         });
         if (!response.ok) {
@@ -135,10 +130,9 @@ export const adminService = {
      * Ban a user.
      */
     async banUser(params: BanUserParams): Promise<void> {
-        const response = await fetch(`${API_BASE_URL}/api/admin/users/${params.userId}/ban`, {
+        const response = await fetchWithAuth(`${API_BASE_URL}/api/admin/users/${params.userId}/ban`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            credentials: "include",
             body: JSON.stringify({ banReason: params.banReason }),
         });
         if (!response.ok) {
@@ -151,9 +145,8 @@ export const adminService = {
      * Unban a user.
      */
     async unbanUser(userId: string): Promise<void> {
-        const response = await fetch(`${API_BASE_URL}/api/admin/users/${userId}/unban`, {
+        const response = await fetchWithAuth(`${API_BASE_URL}/api/admin/users/${userId}/unban`, {
             method: "POST",
-            credentials: "include",
         });
         if (!response.ok) {
             const error = await response.json().catch(() => ({}));
@@ -166,10 +159,9 @@ export const adminService = {
      */
     async setRole(params: SetRoleParams): Promise<void> {
         const role = Array.isArray(params.role) ? params.role[0] : params.role;
-        const response = await fetch(`${API_BASE_URL}/api/admin/users/${params.userId}/role`, {
+        const response = await fetchWithAuth(`${API_BASE_URL}/api/admin/users/${params.userId}/role`, {
             method: "PUT",
             headers: { "Content-Type": "application/json" },
-            credentials: "include",
             body: JSON.stringify({ role }),
         });
         if (!response.ok) {
@@ -182,10 +174,9 @@ export const adminService = {
      * Set a user's password.
      */
     async setPassword(params: SetPasswordParams): Promise<void> {
-        const response = await fetch(`${API_BASE_URL}/api/admin/users/${params.userId}/password`, {
+        const response = await fetchWithAuth(`${API_BASE_URL}/api/admin/users/${params.userId}/password`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            credentials: "include",
             body: JSON.stringify({ newPassword: params.newPassword }),
         });
         if (!response.ok) {
@@ -200,9 +191,7 @@ export const adminService = {
      * List all sessions for a user.
      */
     async listUserSessions(userId: string): Promise<UserSession[]> {
-        const response = await fetch(`${API_BASE_URL}/api/admin/users/${userId}/sessions`, {
-            credentials: "include",
-        });
+        const response = await fetchWithAuth(`${API_BASE_URL}/api/admin/users/${userId}/sessions`);
         if (!response.ok) {
             const error = await response.json().catch(() => ({}));
             throw new Error(error.message || "Failed to list user sessions");
@@ -214,10 +203,9 @@ export const adminService = {
      * Revoke a specific session.
      */
     async revokeSession(sessionToken: string): Promise<void> {
-        const response = await fetch(`${API_BASE_URL}/api/admin/users/sessions/revoke`, {
+        const response = await fetchWithAuth(`${API_BASE_URL}/api/admin/users/sessions/revoke`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            credentials: "include",
             body: JSON.stringify({ sessionToken }),
         });
         if (!response.ok) {
@@ -230,9 +218,8 @@ export const adminService = {
      * Revoke all sessions for a user.
      */
     async revokeAllSessions(userId: string): Promise<void> {
-        const response = await fetch(`${API_BASE_URL}/api/admin/users/${userId}/sessions/revoke-all`, {
+        const response = await fetchWithAuth(`${API_BASE_URL}/api/admin/users/${userId}/sessions/revoke-all`, {
             method: "POST",
-            credentials: "include",
         });
         if (!response.ok) {
             const error = await response.json().catch(() => ({}));
@@ -245,9 +232,7 @@ export const adminService = {
         allowedRoleNames: Array<'admin' | 'manager' | 'member'>;
         organizations: Array<{ id: string; name: string; slug: string }>;
     }> {
-        const response = await fetch(`${API_BASE_URL}/api/admin/users/create-metadata`, {
-            credentials: "include",
-        });
+        const response = await fetchWithAuth(`${API_BASE_URL}/api/admin/users/create-metadata`);
         if (!response.ok) {
             const error = await response.json().catch(() => ({}));
             throw new Error(error.message || "Failed to fetch create user metadata");
@@ -354,9 +339,7 @@ export const organizationService = {
         if (params.limit) url.searchParams.set("limit", String(params.limit));
         if (params.search) url.searchParams.set("search", params.search);
 
-        const response = await fetch(url.toString(), {
-            credentials: "include",
-        });
+        const response = await fetchWithAuth(url.toString());
         if (!response.ok) {
             const error = await response.json().catch(() => ({}));
             throw new Error(error.message || "Failed to list organizations");
@@ -417,9 +400,8 @@ export const organizationService = {
      * Delete an organization (admin - can delete any organization).
      */
     async deleteOrganization(organizationId: string) {
-        const response = await fetch(`${API_BASE_URL}/api/platform-admin/organizations/${organizationId}`, {
+        const response = await fetchWithAuth(`${API_BASE_URL}/api/platform-admin/organizations/${organizationId}`, {
             method: "DELETE",
-            credentials: "include",
         });
         if (!response.ok) {
             const error = await response.json().catch(() => ({}));
@@ -431,9 +413,7 @@ export const organizationService = {
      * List members of an organization (admin - can view any organization).
      */
     async listMembers(organizationId: string) {
-        const response = await fetch(`${API_BASE_URL}/api/platform-admin/organizations/${organizationId}/members`, {
-            credentials: "include",
-        });
+        const response = await fetchWithAuth(`${API_BASE_URL}/api/platform-admin/organizations/${organizationId}/members`);
         if (!response.ok) {
             const error = await response.json().catch(() => ({}));
             throw new Error(error.message || "Failed to list members");
@@ -446,10 +426,9 @@ export const organizationService = {
      * Add an existing user to an organization (admin).
      */
     async addMember(organizationId: string, userId: string, role: string) {
-        const response = await fetch(`${API_BASE_URL}/api/platform-admin/organizations/${organizationId}/members`, {
+        const response = await fetchWithAuth(`${API_BASE_URL}/api/platform-admin/organizations/${organizationId}/members`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            credentials: "include",
             body: JSON.stringify({ userId, role }),
         });
         if (!response.ok) {
@@ -510,9 +489,7 @@ export const organizationService = {
      * List invitations for an organization (admin - can view any organization).
      */
     async listInvitations(organizationId: string) {
-        const response = await fetch(`${API_BASE_URL}/api/platform-admin/organizations/${organizationId}/invitations`, {
-            credentials: "include",
-        });
+        const response = await fetchWithAuth(`${API_BASE_URL}/api/platform-admin/organizations/${organizationId}/invitations`);
         if (!response.ok) {
             const error = await response.json().catch(() => ({}));
             throw new Error(error.message || "Failed to list invitations");
@@ -536,9 +513,8 @@ export const organizationService = {
      * Delete an invitation (admin - can delete any invitation).
      */
     async deleteInvitation(organizationId: string, invitationId: string) {
-        const response = await fetch(`${API_BASE_URL}/api/platform-admin/organizations/${organizationId}/invitations/${invitationId}`, {
+        const response = await fetchWithAuth(`${API_BASE_URL}/api/platform-admin/organizations/${organizationId}/invitations/${invitationId}`, {
             method: "DELETE",
-            credentials: "include",
         });
         if (!response.ok) {
             const error = await response.json().catch(() => ({}));

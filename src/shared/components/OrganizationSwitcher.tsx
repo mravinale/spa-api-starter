@@ -49,12 +49,30 @@ export function OrganizationSwitcher() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [orgsResult, memberResult] = await Promise.all([
-          organization.list(),
-          organization.getActiveMember(),
-        ])
-        setOrganizations((orgsResult.data ?? []) as Organization[])
-        setActiveMember(memberResult.data as { organizationId?: string } | null)
+        // Fetch orgs first; getActiveMember may fail if no org is active
+        const orgsResult = await organization.list()
+        const orgs = (orgsResult.data ?? []) as Organization[]
+        setOrganizations(orgs)
+
+        let member: { organizationId?: string } | null = null
+        try {
+          const memberResult = await organization.getActiveMember()
+          member = memberResult.data as { organizationId?: string } | null
+        } catch {
+          // No active org — expected for new users
+        }
+        setActiveMember(member)
+
+        // Auto-activate first org if user has orgs but none is active
+        if (orgs.length > 0 && !member?.organizationId) {
+          try {
+            await organization.setActive({ organizationId: orgs[0].id })
+            window.location.reload()
+            return
+          } catch (err) {
+            console.error("Failed to auto-activate organization:", err)
+          }
+        }
       } catch (error) {
         console.error("Failed to fetch organizations:", error)
       } finally {

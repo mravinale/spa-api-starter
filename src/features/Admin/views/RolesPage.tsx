@@ -176,9 +176,10 @@ export function RolesPage() {
     }
     
     try {
+      const token = localStorage.getItem("bearer_token");
       const response = await fetch(
         `${import.meta.env.VITE_API_URL || "http://localhost:3000"}/api/rbac/roles/${roleId}`,
-        { credentials: "include" }
+        { headers: token ? { Authorization: `Bearer ${token}` } : {} }
       );
       if (response.ok) {
         const result = await response.json();
