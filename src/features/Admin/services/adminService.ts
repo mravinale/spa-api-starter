@@ -271,6 +271,11 @@ export const adminService = {
             }
             const data = await response.json();
             if (data.sessionToken) {
+                // Save original token so we can restore it when stopping impersonation
+                const originalToken = localStorage.getItem("bearer_token");
+                if (originalToken) {
+                    localStorage.setItem("original_bearer_token", originalToken);
+                }
                 localStorage.setItem("bearer_token", data.sessionToken);
             }
         }
@@ -281,20 +286,24 @@ export const adminService = {
      * Admin uses Better Auth's built-in endpoint.
      * Manager uses org-scoped endpoint.
      */
-    async stopImpersonating(options?: { role?: string }): Promise<void> {
-        const role = options?.role || "admin";
+    async stopImpersonating(): Promise<void> {
+        const originalToken = localStorage.getItem("original_bearer_token");
 
-        if (role === "admin") {
-            const { error } = await admin.stopImpersonating();
-            if (error) {
-                throw new Error(error.message || "Failed to stop impersonating");
-            }
-        } else {
+        if (originalToken) {
+            // Org-scoped impersonation: delete the impersonated session, restore original token
             const response = await fetchWithAuth(`${API_BASE_URL}/api/organization/stop-impersonating`, {
                 method: "POST",
             });
             if (!response.ok) {
                 const error = await response.json().catch(() => ({}));
+                throw new Error(error.message || "Failed to stop impersonating");
+            }
+            localStorage.setItem("bearer_token", originalToken);
+            localStorage.removeItem("original_bearer_token");
+        } else {
+            // Admin impersonation: use Better Auth's built-in endpoint
+            const { error } = await admin.stopImpersonating();
+            if (error) {
                 throw new Error(error.message || "Failed to stop impersonating");
             }
         }

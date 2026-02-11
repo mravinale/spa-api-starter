@@ -190,6 +190,6 @@ export function useImpersonateUser() {
  */
 export function useStopImpersonating() {
     return useMutation({
-        mutationFn: (params?: { role?: string }) => adminService.stopImpersonating(params),
+        mutationFn: () => adminService.stopImpersonating(),
     });
 }
