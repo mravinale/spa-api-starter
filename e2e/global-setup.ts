@@ -1,15 +1,15 @@
 import { Pool } from 'pg';
+import { DATABASE_URL, API_BASE_URL, TEST_USER } from './env';
 
-const TEST_USER_EMAIL = 'test@example.com';
-const TEST_USER_PASSWORD = 'password123';
-const API_BASE_URL = 'http://localhost:3000';
+const TEST_USER_EMAIL = TEST_USER.email;
+const TEST_USER_PASSWORD = TEST_USER.password;
 
 /**
  * Global setup for Playwright tests.
  * Creates test user if not exists, sets as admin, and clears sessions.
  */
 async function globalSetup() {
-  const databaseUrl = process.env.DATABASE_URL || 'postgresql://mravinale@localhost:5432/nestjs-api-starter';
+  const databaseUrl = DATABASE_URL;
   
   const pool = new Pool({
     connectionString: databaseUrl,

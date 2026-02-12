@@ -1,8 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { Pool } from 'pg';
-
-const API_BASE_URL = 'http://localhost:3000';
-const DATABASE_URL = process.env.DATABASE_URL || 'postgresql://mravinale@localhost:5432/nestjs-api-starter';
+import { DATABASE_URL, API_BASE_URL } from './env';
 
 /**
  * API Tests for Unified Roles - Database-Driven

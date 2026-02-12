@@ -1,4 +1,5 @@
 import { defineConfig, devices } from '@playwright/test';
+import { API_BASE_URL, FE_URL, ENV_TEST_PATH } from './e2e/env';
 
 export default defineConfig({
   testDir: './e2e',
@@ -10,7 +11,7 @@ export default defineConfig({
   workers: 1, // Single worker to ensure test isolation
   reporter: 'html',
   use: {
-    baseURL: 'http://localhost:5173',
+    baseURL: FE_URL,
     trace: 'on-first-retry',
   },
   projects: [
@@ -23,13 +24,15 @@ export default defineConfig({
     {
       command: 'npm run start:dev',
       cwd: '../nestjs-api-starter',
-      url: 'http://localhost:3000/api/auth/ok',
+      url: `${API_BASE_URL}/api/auth/ok`,
       reuseExistingServer: !process.env.CI,
       timeout: 120 * 1000,
+      // Tell dotenv/config (used by the backend) to load .env.test
+      env: { DOTENV_CONFIG_PATH: ENV_TEST_PATH },
     },
     {
       command: 'npm run dev',
-      url: 'http://localhost:5173',
+      url: FE_URL,
       reuseExistingServer: !process.env.CI,
       timeout: 120 * 1000,
     },

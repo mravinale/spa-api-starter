@@ -1,13 +1,14 @@
 import { Pool } from 'pg';
+import { DATABASE_URL, TEST_USER } from './env';
 
-const TEST_USER_EMAIL = 'test@example.com';
+const TEST_USER_EMAIL = TEST_USER.email;
 
 /**
  * Global teardown for Playwright tests.
  * Deletes test user and related data after all tests complete.
  */
 async function globalTeardown() {
-  const databaseUrl = process.env.DATABASE_URL || 'postgresql://mravinale@localhost:5432/nestjs-api-starter';
+  const databaseUrl = DATABASE_URL;
   
   const pool = new Pool({
     connectionString: databaseUrl,

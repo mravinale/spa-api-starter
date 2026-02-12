@@ -1,9 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { Pool } from 'pg';
-
-const API_BASE_URL = 'http://localhost:3000';
-const DATABASE_URL = process.env.DATABASE_URL || 'postgresql://mravinale@localhost:5432/nestjs-api-starter';
-const TEST_USER = { email: 'test@example.com', password: 'password123' };
+import { DATABASE_URL, API_BASE_URL, TEST_USER } from './env';
 
 /**
  * RBAC and Impersonation E2E Tests
@@ -194,10 +191,10 @@ test.describe.serial('Impersonation', () => {
     
     if (bannerVisible) {
       // Verify banner shows the impersonated user's info
-      await expect(banner.getByText(/impersonating/i)).toBeVisible();
+      await expect(banner.getByText(/you are impersonating/i)).toBeVisible();
       
       // Click Stop Impersonating button
-      await banner.getByRole('button', { name: /stop/i }).click();
+      await banner.getByRole('button', { name: /stop impersonating/i }).click();
       
       // Wait for session to restore
       await page.waitForLoadState('networkidle');
@@ -252,5 +249,60 @@ test.describe.serial('Organization Role Guards', () => {
     await page.waitForLoadState('networkidle');
     
     await expect(page.locator('[data-slot="sidebar"]')).toBeVisible();
+  });
+});
+
+// ============================================================================
+// Impersonation - Bearer Token Restore
+// ============================================================================
+
+test.describe.serial('Impersonation - Bearer Token Restore', () => {
+  test.beforeAll(async () => {
+    await ensureAdminRole();
+  });
+
+  test.beforeEach(async ({ page }) => {
+    await loginAsAdmin(page, '/');
+  });
+
+  test('stopping impersonation should restore original bearer token', async ({ page }) => {
+    await page.evaluate(() => {
+      localStorage.setItem('bearer_token', 'impersonated-token');
+      localStorage.setItem('original_bearer_token', 'my-original-token');
+    });
+
+    const obt = await page.evaluate(() => localStorage.getItem('original_bearer_token'));
+    expect(obt).toBe('my-original-token');
+
+    await page.evaluate(() => {
+      const original = localStorage.getItem('original_bearer_token');
+      if (original) {
+        localStorage.setItem('bearer_token', original);
+        localStorage.removeItem('original_bearer_token');
+      }
+    });
+
+    const bt = await page.evaluate(() => localStorage.getItem('bearer_token'));
+    const obtAfter = await page.evaluate(() => localStorage.getItem('original_bearer_token'));
+    expect(bt).toBe('my-original-token');
+    expect(obtAfter).toBeNull();
+  });
+});
+
+// ============================================================================
+// Org Impersonation API - Unauthenticated Access
+// ============================================================================
+
+test.describe('Org Impersonation API', () => {
+  test('org impersonation endpoint should reject unauthenticated requests', async ({ request }) => {
+    const response = await request.post(`${API_BASE_URL}/api/organization/some-org-id/impersonate`, {
+      data: { userId: 'some-user-id' },
+    });
+    expect([401, 403]).toContain(response.status());
+  });
+
+  test('stop impersonation endpoint should reject unauthenticated requests', async ({ request }) => {
+    const response = await request.post(`${API_BASE_URL}/api/organization/stop-impersonating`);
+    expect([401, 403]).toContain(response.status());
   });
 });

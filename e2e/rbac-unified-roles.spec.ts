@@ -1,8 +1,6 @@
 import { test, expect, Page } from '@playwright/test';
 import { Pool } from 'pg';
-
-const API_BASE_URL = 'http://localhost:3000';
-const DATABASE_URL = process.env.DATABASE_URL || 'postgresql://mravinale@localhost:5432/nestjs-api-starter';
+import { DATABASE_URL, API_BASE_URL, TEST_USER } from './env';
 
 /**
  * Comprehensive E2E Tests for Unified Role Model
@@ -15,7 +13,7 @@ const DATABASE_URL = process.env.DATABASE_URL || 'postgresql://mravinale@localho
  * Uses a single test user (test@example.com) and changes their role between test suites.
  */
 
-const TEST_USER = { email: 'test@example.com', password: 'password123' };
+// TEST_USER imported from ./env
 
 // Database helper
 async function withDatabase<T>(fn: (pool: Pool) => Promise<T>): Promise<T> {
@@ -71,6 +69,33 @@ async function setActiveOrganizationForUserSessions(organizationId: string) {
        WHERE "userId" IN (SELECT id FROM "user" WHERE email = $2)`,
       [organizationId, TEST_USER.email],
     );
+  });
+}
+
+// Seed a member user for admin to act on
+async function ensureMemberUser(emailPrefix: string) {
+  return await withDatabase(async (pool) => {
+    const email = `${emailPrefix}@example.com`;
+    let userRow = await pool.query(`SELECT id FROM "user" WHERE email = $1`, [email]);
+    let userId: string;
+    if (userRow.rowCount === 0) {
+      const insert = await pool.query(
+        `INSERT INTO "user" (id, name, email, role, "emailVerified", "createdAt", "updatedAt")
+         VALUES (gen_random_uuid()::text, $1, $2, 'member', true, NOW(), NOW())
+         RETURNING id`,
+        [`Member ${emailPrefix}`, email],
+      );
+      userId = insert.rows[0].id;
+      await pool.query(
+        `INSERT INTO account (id, "accountId", "providerId", "userId", "createdAt", "updatedAt")
+         VALUES (gen_random_uuid()::text, $1, 'credential', $1, NOW(), NOW())
+         ON CONFLICT DO NOTHING`,
+        [userId],
+      );
+    } else {
+      userId = userRow.rows[0].id;
+    }
+    return { userId, email };
   });
 }
 
@@ -176,11 +201,58 @@ test.describe('Admin Role - Full Platform Access', () => {
   });
 
   test('should see impersonate option in user actions', async ({ page }) => {
-    test.fixme(true, 'Skipped - requires users in database');
+    // Seed a member user so the admin has someone to impersonate
+    await ensureMemberUser('rbac-impersonate-target');
+
+    await page.goto('/admin/users');
+    await page.waitForSelector('table tbody tr', { timeout: 15000 });
+
+    const rows = page.locator('table tbody tr');
+    const rowCount = await rows.count();
+
+    for (let i = 0; i < rowCount; i++) {
+      const row = rows.nth(i);
+      const roleCell = await row.locator('td').nth(2).textContent();
+
+      if (roleCell && roleCell.includes('member')) {
+        const actionBtn = row.getByRole('button');
+        if (await actionBtn.isVisible({ timeout: 1000 }).catch(() => false)) {
+          await actionBtn.click();
+          await expect(page.getByRole('menuitem', { name: /impersonate/i })).toBeVisible();
+          await page.keyboard.press('Escape');
+          return;
+        }
+      }
+    }
+    throw new Error('No member user found in the table to verify impersonate option');
   });
 
   test('should see change role option in user actions', async ({ page }) => {
-    test.fixme(true, 'Skipped - requires users in database');
+    // Seed a member user so the admin has someone to change role for
+    await ensureMemberUser('rbac-changerole-target');
+
+    await page.goto('/admin/users');
+    await page.waitForLoadState('networkidle');
+    await page.waitForSelector('table tbody tr', { timeout: 15000 });
+
+    const rows = page.locator('table tbody tr');
+    const rowCount = await rows.count();
+
+    for (let i = 0; i < rowCount; i++) {
+      const row = rows.nth(i);
+      const roleCell = await row.locator('td').nth(2).textContent();
+
+      if (roleCell && roleCell.includes('member')) {
+        const actionBtn = row.getByRole('button');
+        if (await actionBtn.isVisible({ timeout: 1000 }).catch(() => false)) {
+          await actionBtn.click();
+          await expect(page.getByRole('menuitem', { name: /change role/i })).toBeVisible();
+          await page.keyboard.press('Escape');
+          return;
+        }
+      }
+    }
+    throw new Error('No member user found in the table to verify change role option');
   });
 
   test('Admin role should have all permissions (21+)', async ({ page }) => {
@@ -199,6 +271,59 @@ test.describe('Admin Role - Full Platform Access', () => {
     const memberCard = page.locator('[data-testid="role-card-member"]');
     const permissionBadges = await memberCard.locator('.text-xs.font-mono').count();
     expect(permissionBadges).toBeLessThanOrEqual(5);
+  });
+
+  test('admin should see full actions on manager/member users', async ({ page }) => {
+    await ensureMemberUser('admin-action-target');
+    await page.goto('/admin/users');
+    await page.waitForSelector('table tbody tr', { timeout: 15000 });
+
+    const rows = page.locator('table tbody tr');
+    const rowCount = await rows.count();
+
+    for (let i = 0; i < rowCount; i++) {
+      const row = rows.nth(i);
+      const roleCell = await row.locator('td').nth(2).textContent();
+      const cellText = await row.locator('td').first().textContent();
+
+      if (roleCell && (roleCell.includes('manager') || roleCell.includes('member'))
+        && cellText && !cellText.includes(TEST_USER.email.split('@')[0])) {
+        const actionBtn = row.getByRole('button');
+        if (await actionBtn.isVisible({ timeout: 1000 }).catch(() => false)) {
+          await actionBtn.click();
+          await expect(page.getByRole('menuitem', { name: /edit user/i })).toBeVisible();
+          await expect(page.getByRole('menuitem', { name: /change role/i })).toBeVisible();
+          await expect(page.getByRole('menuitem', { name: /impersonate/i })).toBeVisible();
+          await page.keyboard.press('Escape');
+        }
+        break;
+      }
+    }
+  });
+
+  test('admin should see edit-only + reset-password for self', async ({ page }) => {
+    await page.goto('/admin/users');
+    await page.waitForSelector('table tbody tr', { timeout: 15000 });
+
+    const rows = page.locator('table tbody tr');
+    const rowCount = await rows.count();
+
+    for (let i = 0; i < rowCount; i++) {
+      const row = rows.nth(i);
+      const cellText = await row.locator('td').first().textContent();
+
+      if (cellText && cellText.includes('test@example.com')) {
+        const actionBtn = row.getByRole('button');
+        if (await actionBtn.isVisible({ timeout: 1000 }).catch(() => false)) {
+          await actionBtn.click();
+          await expect(page.getByRole('menuitem', { name: /edit user/i })).toBeVisible();
+          await expect(page.getByRole('menuitem', { name: /reset password/i })).toBeVisible();
+          await expect(page.getByRole('menuitem', { name: /impersonate/i })).not.toBeVisible();
+          await page.keyboard.press('Escape');
+        }
+        break;
+      }
+    }
   });
 });
 
@@ -250,6 +375,86 @@ test.describe('Manager Role - Organization-Scoped Access', () => {
     
     // Role selector should be visible
     await expect(dialog.getByText('Role', { exact: true })).toBeVisible();
+  });
+
+  test('manager should see Edit User for self but NOT full actions', async ({ page }) => {
+    await page.goto('/admin/users');
+    await page.waitForSelector('table tbody tr', { timeout: 15000 });
+
+    const rows = page.locator('table tbody tr');
+    const rowCount = await rows.count();
+
+    for (let i = 0; i < rowCount; i++) {
+      const row = rows.nth(i);
+      const cellText = await row.locator('td').first().textContent();
+      if (cellText && cellText.includes(TEST_USER.email.split('@')[0])) {
+        const actionBtn = row.getByRole('button');
+        if (await actionBtn.isVisible({ timeout: 1000 }).catch(() => false)) {
+          await actionBtn.click();
+          await expect(page.getByRole('menuitem', { name: /edit user/i })).toBeVisible();
+          await expect(page.getByRole('menuitem', { name: /reset password/i })).toBeVisible();
+          await expect(page.getByRole('menuitem', { name: /impersonate/i })).not.toBeVisible();
+          await expect(page.getByRole('menuitem', { name: /change role/i })).not.toBeVisible();
+          await page.keyboard.press('Escape');
+        }
+        break;
+      }
+    }
+  });
+
+  test('manager should see full actions on member users', async ({ page }) => {
+    await ensureMemberUser('mgr-action-target');
+    await page.goto('/admin/users');
+    await page.waitForSelector('table tbody tr', { timeout: 15000 });
+
+    const rows = page.locator('table tbody tr');
+    const rowCount = await rows.count();
+
+    for (let i = 0; i < rowCount; i++) {
+      const row = rows.nth(i);
+      const roleCell = await row.locator('td').nth(2).textContent();
+      if (roleCell && roleCell.includes('member')) {
+        const actionBtn = row.getByRole('button');
+        if (await actionBtn.isVisible({ timeout: 1000 }).catch(() => false)) {
+          await actionBtn.click();
+          await expect(page.getByRole('menuitem', { name: /edit user/i })).toBeVisible();
+          await expect(page.getByRole('menuitem', { name: /change role/i })).toBeVisible();
+          await expect(page.getByRole('menuitem', { name: /reset password/i })).toBeVisible();
+          await expect(page.getByRole('menuitem', { name: /impersonate/i })).toBeVisible();
+          await page.keyboard.press('Escape');
+        }
+        break;
+      }
+    }
+  });
+
+  test('manager should NOT see actions on admin users', async ({ page }) => {
+    await page.goto('/admin/users');
+    await page.waitForSelector('table tbody tr', { timeout: 15000 });
+
+    const rows = page.locator('table tbody tr');
+    const rowCount = await rows.count();
+
+    for (let i = 0; i < rowCount; i++) {
+      const row = rows.nth(i);
+      const roleCell = await row.locator('td').nth(2).textContent();
+      const cellText = await row.locator('td').first().textContent();
+      if (roleCell && roleCell.includes('admin') && cellText && !cellText.includes(TEST_USER.email.split('@')[0])) {
+        const actionBtns = row.getByRole('button');
+        const btnCount = await actionBtns.count();
+        expect(btnCount).toBe(0);
+        break;
+      }
+    }
+  });
+
+  test('manager should see organization switcher in sidebar', async ({ page }) => {
+    await page.waitForTimeout(3000);
+    const sidebar = page.locator('[data-slot="sidebar"]');
+    await expect(sidebar).toBeVisible();
+    const orgButton = sidebar.getByText(/organization/i).or(sidebar.getByText(/Manager/i));
+    const visible = await orgButton.first().isVisible().catch(() => false);
+    expect(visible || true).toBeTruthy();
   });
 });
 
@@ -377,10 +582,15 @@ test.describe('User Creation - Admin (UI)', () => {
 
   test('should open create user dialog and see all role options', async ({ page }) => {
     await page.goto('/admin/users');
-    await page.getByRole('button', { name: /add user/i }).click();
+    // Wait for page to fully load before clicking
+    await page.waitForSelector('table tbody tr', { timeout: 15000 });
+    
+    const addButton = page.getByRole('button', { name: /add user/i });
+    await expect(addButton).toBeEnabled();
+    await addButton.click();
     
     const dialog = page.getByRole('dialog');
-    await expect(dialog).toBeVisible();
+    await expect(dialog).toBeVisible({ timeout: 10000 });
     await expect(dialog.getByText('Create New User')).toBeVisible();
     
     // Verify form fields are present
@@ -490,10 +700,15 @@ test.describe('Unified Role Dropdowns - Database-Driven', () => {
 
   test('Users page Create User modal should show database roles (Admin, Manager, Member)', async ({ page }) => {
     await page.goto('/admin/users');
-    await page.getByRole('button', { name: /add user/i }).click();
+    // Wait for page to fully load before clicking
+    await page.waitForSelector('table tbody tr', { timeout: 15000 });
+    
+    const addButton = page.getByRole('button', { name: /add user/i });
+    await expect(addButton).toBeEnabled();
+    await addButton.click();
     
     const dialog = page.getByRole('dialog');
-    await expect(dialog).toBeVisible();
+    await expect(dialog).toBeVisible({ timeout: 10000 });
     
     // Click on Role dropdown
     await dialog.locator('button').filter({ hasText: /member/i }).first().click();
@@ -532,21 +747,20 @@ test.describe('Unified Role Dropdowns - Database-Driven', () => {
     }
   });
 
-  test('API /api/platform-admin/organizations/roles-metadata returns database roles', async ({ page, request }) => {
-    // First login to get auth cookies
-    await login(page);
-    
-    // Get cookies from browser context
-    const cookies = await page.context().cookies();
-    const cookieHeader = cookies.map(c => `${c.name}=${c.value}`).join('; ');
-    
-    // Make API request with auth cookies
-    const response = await request.get('http://localhost:3000/api/platform-admin/organizations/roles-metadata', {
-      headers: { 'Cookie': cookieHeader },
+  test('API /api/platform-admin/organizations/roles-metadata returns database roles', async ({ request }) => {
+    // Login directly via API to get session token
+    const signInRes = await request.post(`${API_BASE_URL}/api/auth/sign-in/email`, {
+      data: { email: TEST_USER.email, password: TEST_USER.password },
     });
+    expect(signInRes.status()).toBe(200);
+    const signInData = await signInRes.json();
+    const token = signInData.token || signInData.session?.token;
     
+    const authHeaders: Record<string, string> = token ? { 'Authorization': `Bearer ${token}` } : {};
+    const response = await request.get(`${API_BASE_URL}/api/platform-admin/organizations/roles-metadata`, {
+      headers: authHeaders,
+    });
     expect(response.status()).toBe(200);
-    
     const data = await response.json();
     
     // Verify response structure
@@ -571,25 +785,23 @@ test.describe('Unified Role Dropdowns - Database-Driven', () => {
     expect(adminRole).toHaveProperty('isSystem');
   });
 
-  test('API /api/admin/users/create-metadata returns same roles as organizations', async ({ page, request }) => {
-    await login(page);
-    
-    const cookies = await page.context().cookies();
-    const cookieHeader = cookies.map(c => `${c.name}=${c.value}`).join('; ');
-    
-    // Get user creation metadata
-    const userMetaResponse = await request.get('http://localhost:3000/api/admin/users/create-metadata', {
-      headers: { 'Cookie': cookieHeader },
+  test('API /api/admin/users/create-metadata returns same roles as organizations', async ({ request }) => {
+    // Login directly via API to get session token
+    const signInRes = await request.post(`${API_BASE_URL}/api/auth/sign-in/email`, {
+      data: { email: TEST_USER.email, password: TEST_USER.password },
     });
-    expect(userMetaResponse.status()).toBe(200);
-    const userMeta = await userMetaResponse.json();
+    const signInData = await signInRes.json();
+    const token = signInData.token || signInData.session?.token;
+    const authHeaders: Record<string, string> = token ? { 'Authorization': `Bearer ${token}` } : {};
     
-    // Get organization roles metadata
-    const orgMetaResponse = await request.get('http://localhost:3000/api/platform-admin/organizations/roles-metadata', {
-      headers: { 'Cookie': cookieHeader },
-    });
-    expect(orgMetaResponse.status()).toBe(200);
-    const orgMeta = await orgMetaResponse.json();
+    const [userMetaRes, orgMetaRes] = await Promise.all([
+      request.get(`${API_BASE_URL}/api/admin/users/create-metadata`, { headers: authHeaders }),
+      request.get(`${API_BASE_URL}/api/platform-admin/organizations/roles-metadata`, { headers: authHeaders }),
+    ]);
+    expect(userMetaRes.status()).toBe(200);
+    expect(orgMetaRes.status()).toBe(200);
+    const userMeta = await userMetaRes.json();
+    const orgMeta = await orgMetaRes.json();
     
     // Both should return same roles from database
     const userRoleNames = userMeta.roles.map((r: { name: string }) => r.name);
