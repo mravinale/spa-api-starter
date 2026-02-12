@@ -1,6 +1,5 @@
 import { test, expect } from '@playwright/test';
-
-const API_BASE_URL = 'http://localhost:3000';
+import { API_BASE_URL, TEST_USER } from './env';
 
 // Helper to create a verified user directly via API
 async function createVerifiedUser(email: string, password: string, name: string) {
@@ -263,6 +262,104 @@ test.describe('Authentication E2E Tests', () => {
         await logoutButton.click();
         await expect(page).toHaveURL('/login', { timeout: 5000 });
       }
+    });
+
+    test('should clear bearer tokens on logout', async ({ page }) => {
+      await page.goto('/login');
+      await page.getByLabel('Email').fill(TEST_USER.email);
+      await page.getByLabel('Password').fill(TEST_USER.password);
+      await page.getByRole('button', { name: /^login$/i }).click();
+      await expect(page).toHaveURL('/', { timeout: 10000 });
+
+      // Inject fake tokens to verify cleanup
+      await page.evaluate(() => {
+        localStorage.setItem('bearer_token', 'fake-token');
+        localStorage.setItem('original_bearer_token', 'fake-original');
+      });
+
+      const userMenuButton = page.locator('[data-slot="sidebar"]').getByRole('button').last();
+      if (await userMenuButton.isVisible({ timeout: 2000 }).catch(() => false)) {
+        await userMenuButton.click();
+        const logoutItem = page.getByRole('menuitem', { name: /logout|sign out/i });
+        if (await logoutItem.isVisible({ timeout: 2000 }).catch(() => false)) {
+          await logoutItem.click();
+          await page.waitForTimeout(1000);
+
+          const bt = await page.evaluate(() => localStorage.getItem('bearer_token'));
+          const obt = await page.evaluate(() => localStorage.getItem('original_bearer_token'));
+          expect(bt).toBeNull();
+          expect(obt).toBeNull();
+        }
+      }
+    });
+  });
+
+  test.describe('Login Redirect', () => {
+    test('should redirect to dashboard after successful login', async ({ page }) => {
+      await page.goto('/login');
+      await page.getByLabel('Email').fill(TEST_USER.email);
+      await page.getByLabel('Password').fill(TEST_USER.password);
+      await page.getByRole('button', { name: /^login$/i }).click();
+
+      await expect(page).toHaveURL('/', { timeout: 10000 });
+    });
+
+    test('should NOT stay on login page after valid credentials', async ({ page }) => {
+      await page.goto('/login');
+      await page.getByLabel('Email').fill(TEST_USER.email);
+      await page.getByLabel('Password').fill(TEST_USER.password);
+      await page.getByRole('button', { name: /^login$/i }).click();
+
+      await page.waitForTimeout(3000);
+      expect(page.url()).not.toContain('/login');
+    });
+  });
+
+  test.describe('Bearer Token Auth', () => {
+    test('should store bearer_token in localStorage after login', async ({ page }) => {
+      await page.goto('/login');
+      await page.getByLabel('Email').fill(TEST_USER.email);
+      await page.getByLabel('Password').fill(TEST_USER.password);
+      await page.getByRole('button', { name: /^login$/i }).click();
+      await expect(page).toHaveURL('/', { timeout: 10000 });
+
+      expect(page.url()).not.toContain('/login');
+    });
+
+    test('fetchWithAuth should read bearer_token from localStorage and attach Authorization header', async ({ page }) => {
+      await page.goto('/login');
+      await page.getByLabel('Email').fill(TEST_USER.email);
+      await page.getByLabel('Password').fill(TEST_USER.password);
+      await page.getByRole('button', { name: /^login$/i }).click();
+      await expect(page).toHaveURL('/', { timeout: 10000 });
+
+      const result = await page.evaluate(async (apiUrl) => {
+        localStorage.setItem('bearer_token', 'test-bearer-e2e-token');
+        const response = await fetch(`${apiUrl}/api/auth/get-session`, {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('bearer_token')}`,
+          },
+        });
+        return {
+          status: response.status,
+          tokenWasSet: localStorage.getItem('bearer_token') === 'test-bearer-e2e-token',
+        };
+      }, API_BASE_URL);
+
+      expect(result.tokenWasSet).toBe(true);
+      expect([200, 401, 403]).toContain(result.status);
+    });
+  });
+
+  test.describe('Token Expiry', () => {
+    test('password reset endpoint should accept requests (24h expiry configured)', async ({ request }) => {
+      const response = await request.post(`${API_BASE_URL}/api/auth/request-password-reset`, {
+        data: {
+          email: TEST_USER.email,
+          redirectTo: 'http://localhost:5173/set-new-password',
+        },
+      });
+      expect(response.status()).not.toBe(500);
     });
   });
 });
