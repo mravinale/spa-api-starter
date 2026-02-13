@@ -50,6 +50,8 @@ import {
 } from "../hooks/useOrganizations"
 import { adminService } from "../services/adminService"
 import { getOrganizationRolesMetadata } from "../services/adminService"
+import { filterAssignableRoles } from "../utils/role-hierarchy"
+import { useAuth } from "@/shared/context/AuthContext"
 
 interface Organization {
   id: string
@@ -91,6 +93,8 @@ const getMembersArray = (data: unknown): Member[] => {
 
 
 export function OrganizationsPage() {
+  const { user } = useAuth()
+
   // State
   const [selectedOrg, setSelectedOrg] = useState<Organization | null>(null)
   const [createDialogOpen, setCreateDialogOpen] = useState(false)
@@ -464,7 +468,8 @@ export function OrganizationsPage() {
                                   const isOwner = member.role === "owner"
                                   const isOnlyOwner = isOwner && members.filter(m => m.role === "owner").length === 1
                                   // Build role options: include current role even if not in assignableRoles
-                                  const assignable = orgRolesMeta?.assignableRoles ?? []
+                                  const rawAssignable = orgRolesMeta?.assignableRoles ?? []
+                                  const assignable = filterAssignableRoles(rawAssignable, user?.role ?? 'member')
                                   const allRoleOptions = assignable.includes(member.role)
                                     ? assignable
                                     : [member.role, ...assignable]
@@ -681,8 +686,8 @@ export function OrganizationsPage() {
                   <SelectValue placeholder="Select role" />
                 </SelectTrigger>
                 <SelectContent>
-                  {orgRolesMeta?.assignableRoles.map((roleName) => {
-                    const role = orgRolesMeta.roles.find((r) => r.name === roleName)
+                  {filterAssignableRoles(orgRolesMeta?.assignableRoles ?? [], user?.role ?? 'member').map((roleName) => {
+                    const role = orgRolesMeta?.roles.find((r) => r.name === roleName)
                     return (
                       <SelectItem key={roleName} value={roleName}>
                         {role?.displayName || roleName}
