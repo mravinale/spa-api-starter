@@ -1,0 +1,179 @@
+import { test, expect, type Page } from '@playwright/test';
+
+import { TEST_USER } from './env';
+import { loginWithCredentials, withDatabase } from './test-helpers';
+
+const EXISTING_ORG_SLUG = `e2e-org-existing-${Date.now()}`;
+const MANAGE_ORG_SLUG = `e2e-org-manage-${Date.now()}`;
+const MANAGE_MEMBER_EMAIL = `e2e-org-member-${Date.now()}@example.com`;
+
+async function ensureOrganization(slug: string, name: string): Promise<void> {
+  await withDatabase(async (pool) => {
+    await pool.query(
+      `INSERT INTO organization (id, name, slug, "createdAt", metadata)
+       VALUES (gen_random_uuid()::text, $1, $2, NOW(), NULL)
+       ON CONFLICT (slug) DO UPDATE SET name = EXCLUDED.name`,
+      [name, slug],
+    );
+
+    const userResult = await pool.query<{ id: string }>(
+      `SELECT id FROM "user" WHERE email = $1`,
+      [TEST_USER.email],
+    );
+
+    if (userResult.rowCount === 0) {
+      throw new Error(`Missing seeded user ${TEST_USER.email}`);
+    }
+    const orgResult = await pool.query<{ id: string }>(
+      `SELECT id FROM organization WHERE slug = $1`,
+      [slug],
+    );
+
+    const userId = userResult.rows[0].id;
+    const organizationId = orgResult.rows[0].id;
+
+    await pool.query(
+      `INSERT INTO member (id, "organizationId", "userId", role, "createdAt")
+       VALUES (gen_random_uuid()::text, $1, $2, 'owner', NOW())
+       ON CONFLICT DO NOTHING`,
+      [organizationId, userId],
+    );
+  });
+}
+
+async function ensureMemberInOrganization(params: {
+  orgSlug: string;
+  email: string;
+  name: string;
+}): Promise<void> {
+  await withDatabase(async (pool) => {
+    const orgResult = await pool.query<{ id: string }>(
+      `SELECT id FROM organization WHERE slug = $1`,
+      [params.orgSlug],
+    );
+
+    if (orgResult.rowCount === 0) {
+      throw new Error(`Organization not found for member fixture: ${params.orgSlug}`);
+    }
+
+    const userResult = await pool.query<{ id: string }>(
+      `INSERT INTO "user" (id, name, email, role, "emailVerified", "createdAt", "updatedAt")
+       VALUES (gen_random_uuid()::text, $1, $2, 'member', true, NOW(), NOW())
+       ON CONFLICT (email) DO UPDATE SET name = EXCLUDED.name, role = 'member', "updatedAt" = NOW()
+       RETURNING id`,
+      [params.name, params.email],
+    );
+
+    await pool.query(
+      `INSERT INTO member (id, "organizationId", "userId", role, "createdAt")
+       VALUES (gen_random_uuid()::text, $1, $2, 'member', NOW())
+       ON CONFLICT DO NOTHING`,
+      [orgResult.rows[0].id, userResult.rows[0].id],
+    );
+  });
+}
+
+async function loginAsAdmin(page: Page) {
+  await loginWithCredentials(page, TEST_USER.email, TEST_USER.password);
+}
+
+async function openOrganizationsPage(page: Page) {
+  await page.goto('/admin/organizations');
+  await page.waitForLoadState('networkidle');
+  await expect(page.getByRole('heading', { name: /organizations/i })).toBeVisible();
+}
+
+test.describe('Organizations edge cases', () => {
+  test.beforeAll(async () => {
+    await ensureOrganization(EXISTING_ORG_SLUG, 'E2E Existing Organization');
+    await ensureOrganization(MANAGE_ORG_SLUG, 'E2E Manage Organization');
+    await ensureMemberInOrganization({
+      orgSlug: MANAGE_ORG_SLUG,
+      email: MANAGE_MEMBER_EMAIL,
+      name: 'E2E Manage Member',
+    });
+  });
+
+  test('create organization should enforce slug availability before submit', async ({ page }) => {
+    await loginAsAdmin(page);
+    await openOrganizationsPage(page);
+
+    const createOrganizationButton = page.getByRole('button', { name: /^create organization$/i });
+    await expect(createOrganizationButton).toBeVisible({ timeout: 10000 });
+    await createOrganizationButton.click();
+    const dialog = page.getByRole('dialog');
+
+    const isDialogVisible = await dialog.isVisible({ timeout: 1500 }).catch(() => false);
+    if (!isDialogVisible) {
+      await createOrganizationButton.click();
+    }
+
+    await expect(dialog).toBeVisible({ timeout: 10000 });
+
+    await dialog.getByLabel('Name').fill('E2E Slug Validation Org');
+
+    await dialog.locator('input#org-slug').fill(EXISTING_ORG_SLUG);
+    await expect(dialog.getByText(/checking/i)).toBeVisible({ timeout: 10000 });
+
+    const createButton = dialog.getByRole('button', { name: /^create$/i });
+    await expect(createButton).toBeDisabled();
+
+    const availableSlug = `e2e-org-available-${Date.now()}`;
+    await dialog.locator('input#org-slug').fill(availableSlug);
+    await expect(dialog.getByText(/available/i)).toBeVisible({ timeout: 10000 });
+    await expect(createButton).toBeEnabled();
+  });
+
+  test('add member dialog should keep submit disabled until a user is selected', async ({ page }) => {
+    await loginAsAdmin(page);
+    await openOrganizationsPage(page);
+
+    const searchInput = page.getByPlaceholder(/search organizations/i);
+    await searchInput.fill(MANAGE_ORG_SLUG);
+
+    const targetOrg = page.locator('button', { hasText: `/${MANAGE_ORG_SLUG}` }).first();
+    await expect(targetOrg).toBeVisible({ timeout: 15000 });
+    await targetOrg.click();
+
+    await page.getByRole('button', { name: /add member/i }).click();
+    const dialog = page.getByRole('dialog');
+    await expect(dialog).toBeVisible();
+
+    const addButton = dialog.getByRole('button', { name: /^add member$/i });
+    await expect(addButton).toBeDisabled();
+
+    const noUsersOption = dialog.getByText(/no users available/i);
+    if (await noUsersOption.isVisible().catch(() => false)) {
+      await expect(addButton).toBeDisabled();
+    }
+  });
+
+  test('cancel remove member should keep member count unchanged', async ({ page }) => {
+    await loginAsAdmin(page);
+    await openOrganizationsPage(page);
+
+    const searchInput = page.getByPlaceholder(/search organizations/i);
+    await searchInput.fill(MANAGE_ORG_SLUG);
+
+    const targetOrg = page.locator('button', { hasText: `/${MANAGE_ORG_SLUG}` }).first();
+    await expect(targetOrg).toBeVisible({ timeout: 15000 });
+    await targetOrg.click();
+
+    const targetMemberRow = page.locator('table tbody tr', { hasText: MANAGE_MEMBER_EMAIL }).first();
+    await expect(targetMemberRow).toBeVisible({ timeout: 15000 });
+
+    const memberRows = page.locator('table tbody tr');
+    const beforeCount = await memberRows.count();
+
+    const removeButton = targetMemberRow.getByRole('button');
+    await removeButton.click();
+
+    const dialog = page.getByRole('dialog');
+    await expect(dialog).toBeVisible();
+    await dialog.getByRole('button', { name: /cancel/i }).click();
+    await expect(dialog).not.toBeVisible();
+
+    const afterCount = await page.locator('table tbody tr').count();
+    expect(afterCount).toBe(beforeCount);
+  });
+});

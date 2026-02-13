@@ -236,9 +236,11 @@ test.describe('Admin Panel E2E Tests', () => {
     test('should display member roles correctly in organization details', async ({ page }) => {
       await page.waitForLoadState('networkidle');
 
-      const targetOrg = page.getByRole('button', {
-        name: new RegExp(`/${AUX_ORG_SLUG}$`, 'i'),
-      });
+      const searchInput = page.getByPlaceholder(/search organizations/i);
+      await expect(searchInput).toBeVisible({ timeout: 10000 });
+      await searchInput.fill(AUX_ORG_SLUG);
+
+      const targetOrg = page.locator('button', { hasText: `/${AUX_ORG_SLUG}` }).first();
       await expect(targetOrg).toBeVisible({ timeout: 15000 });
 
       await targetOrg.click();
@@ -441,10 +443,12 @@ test.describe('Admin Panel E2E Tests', () => {
     test('should show edit button for organizations', async ({ page }) => {
       // Wait for organizations to load
       await page.waitForTimeout(1000);
+
+      const searchInput = page.getByPlaceholder(/search organizations/i);
+      await expect(searchInput).toBeVisible({ timeout: 10000 });
+      await searchInput.fill(AUX_ORG_SLUG);
       
-      const targetOrg = page.getByRole('button', {
-        name: new RegExp(`/${AUX_ORG_SLUG}$`, 'i'),
-      });
+      const targetOrg = page.locator('button', { hasText: `/${AUX_ORG_SLUG}` }).first();
       await expect(targetOrg).toBeVisible({ timeout: 15000 });
 
       // Open organization actions menu and verify Edit action is available
