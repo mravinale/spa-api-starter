@@ -21,6 +21,21 @@ async function withDatabase<T>(fn: (pool: Pool) => Promise<T>): Promise<T> {
   }
 }
 
+async function findOrganizationCardBySlug(page: import('@playwright/test').Page, slug: string) {
+  const searchInput = page.getByPlaceholder(/search organizations/i);
+  await expect(searchInput).toBeVisible({ timeout: 10000 });
+  await searchInput.fill(slug);
+  await page.waitForTimeout(800);
+
+  const targetOrg = page
+    .locator('button')
+    .filter({ hasText: new RegExp(`/${slug}\\b`, 'i') })
+    .first();
+
+  await expect(targetOrg).toBeVisible({ timeout: 15000 });
+  return targetOrg;
+}
+
 async function ensureAdminFixtures(): Promise<void> {
   await withDatabase(async (pool) => {
     const adminResult = await pool.query<{ id: string }>(
@@ -42,7 +57,9 @@ async function ensureAdminFixtures(): Promise<void> {
     await pool.query(
       `INSERT INTO organization (id, name, slug, "createdAt", metadata)
        VALUES (gen_random_uuid()::text, $1, $2, NOW(), NULL)
-       ON CONFLICT (slug) DO NOTHING`,
+       ON CONFLICT (slug) DO UPDATE
+         SET name = EXCLUDED.name,
+             "createdAt" = NOW()`,
       ['E2E Admin Organization', AUX_ORG_SLUG],
     );
 
@@ -236,10 +253,7 @@ test.describe('Admin Panel E2E Tests', () => {
     test('should display member roles correctly in organization details', async ({ page }) => {
       await page.waitForLoadState('networkidle');
 
-      const targetOrg = page.getByRole('button', {
-        name: new RegExp(`/${AUX_ORG_SLUG}$`, 'i'),
-      });
-      await expect(targetOrg).toBeVisible({ timeout: 15000 });
+      const targetOrg = await findOrganizationCardBySlug(page, AUX_ORG_SLUG);
 
       await targetOrg.click();
       await page.waitForTimeout(1000);
@@ -442,10 +456,7 @@ test.describe('Admin Panel E2E Tests', () => {
       // Wait for organizations to load
       await page.waitForTimeout(1000);
       
-      const targetOrg = page.getByRole('button', {
-        name: new RegExp(`/${AUX_ORG_SLUG}$`, 'i'),
-      });
-      await expect(targetOrg).toBeVisible({ timeout: 15000 });
+      const targetOrg = await findOrganizationCardBySlug(page, AUX_ORG_SLUG);
 
       // Open organization actions menu and verify Edit action is available
       const orgActionsButton = targetOrg.locator('button').first();
