@@ -8,6 +8,8 @@ import {
   useAcceptInvitation,
   useRejectInvitation,
   useActiveMember,
+  useRemoveMember,
+  useUpdateMemberRole,
   useLeaveOrganization,
   useSetActiveOrganization,
   useCheckSlug,
@@ -23,6 +25,8 @@ vi.mock("../../services/adminService", () => ({
     acceptInvitation: vi.fn(),
     rejectInvitation: vi.fn(),
     getActiveMember: vi.fn(),
+    removeMember: vi.fn(),
+    updateMemberRole: vi.fn(),
     leaveOrganization: vi.fn(),
     setActive: vi.fn(),
     checkSlug: vi.fn(),
@@ -36,6 +40,8 @@ const mockOrgService = organizationService as unknown as {
   acceptInvitation: Mock
   rejectInvitation: Mock
   getActiveMember: Mock
+  removeMember: Mock
+  updateMemberRole: Mock
   leaveOrganization: Mock
   setActive: Mock
   checkSlug: Mock
@@ -166,6 +172,41 @@ describe("useOrganizations hooks", () => {
       await result.current.mutateAsync("org-1")
 
       expect(mockOrgService.leaveOrganization).toHaveBeenCalledWith("org-1")
+    })
+  })
+
+  describe("useRemoveMember", () => {
+    it("should remove a member", async () => {
+      mockOrgService.removeMember.mockResolvedValue(undefined)
+
+      const { result } = renderHook(() => useRemoveMember(), {
+        wrapper: createWrapper(),
+      })
+
+      await result.current.mutateAsync({ organizationId: "org-1", memberId: "member-1" })
+
+      expect(mockOrgService.removeMember).toHaveBeenCalledWith({
+        organizationId: "org-1",
+        memberId: "member-1",
+      })
+    })
+  })
+
+  describe("useUpdateMemberRole", () => {
+    it("should update member role", async () => {
+      mockOrgService.updateMemberRole.mockResolvedValue(undefined)
+
+      const { result } = renderHook(() => useUpdateMemberRole(), {
+        wrapper: createWrapper(),
+      })
+
+      await result.current.mutateAsync({ organizationId: "org-1", memberId: "member-1", role: "manager" })
+
+      expect(mockOrgService.updateMemberRole).toHaveBeenCalledWith({
+        organizationId: "org-1",
+        memberId: "member-1",
+        role: "manager",
+      })
     })
   })
 

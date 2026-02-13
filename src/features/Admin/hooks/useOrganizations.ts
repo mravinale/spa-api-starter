@@ -124,7 +124,7 @@ export function useRemoveMember() {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: (params: { organizationId: string; memberIdOrEmail: string }) =>
+        mutationFn: (params: { organizationId: string; memberId: string }) =>
             organizationService.removeMember(params),
         onSuccess: (_, variables) => {
             queryClient.invalidateQueries({ queryKey: organizationKeys.members(variables.organizationId) });
@@ -139,7 +139,7 @@ export function useUpdateMemberRole() {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: (params: { organizationId: string; memberId: string; role: string | string[] }) =>
+        mutationFn: (params: { organizationId: string; memberId: string; role: 'admin' | 'manager' | 'member' }) =>
             organizationService.updateMemberRole(params),
         onSuccess: (_, variables) => {
             queryClient.invalidateQueries({ queryKey: organizationKeys.members(variables.organizationId) });

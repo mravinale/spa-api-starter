@@ -253,7 +253,7 @@ export function OrganizationsPage() {
     try {
       await removeMember.mutateAsync({
         organizationId: selectedOrg.id,
-        memberIdOrEmail: selectedMember.id,
+        memberId: selectedMember.id,
       })
       toast.success("Member removed successfully")
       setRemoveMemberDialogOpen(false)
@@ -263,7 +263,7 @@ export function OrganizationsPage() {
     }
   }
 
-  const handleUpdateRole = async (memberId: string, newRole: string) => {
+  const handleUpdateRole = async (memberId: string, newRole: "admin" | "manager" | "member") => {
     if (!selectedOrg) return
     try {
       await updateMemberRole.mutateAsync({
@@ -476,7 +476,11 @@ export function OrganizationsPage() {
                                   return (
                                     <Select
                                       value={member.role || undefined}
-                                      onValueChange={(value) => handleUpdateRole(member.id, value)}
+                                      onValueChange={(value) => {
+                                        if (value === "admin" || value === "manager" || value === "member") {
+                                          handleUpdateRole(member.id, value)
+                                        }
+                                      }}
                                       disabled={isOnlyOwner}
                                     >
                                       <SelectTrigger className="w-32">
