@@ -1,5 +1,10 @@
 import { test, expect } from '@playwright/test';
-import { API_BASE_URL } from './env';
+import { Pool } from 'pg';
+import { DATABASE_URL, TEST_USER } from './env';
+
+const AUX_ORG_SLUG = 'e2e-admin-org';
+const AUX_MEMBER_EMAIL = 'e2e-admin-member@example.com';
+const AUX_MANAGER_EMAIL = 'e2e-admin-manager@example.com';
 
 /**
  * Admin Panel E2E Tests
@@ -7,47 +12,85 @@ import { API_BASE_URL } from './env';
  * These tests automatically set up the test user as admin before running.
  */
 
-// Helper to set user as admin via direct database API call
-async function ensureAdminUser(): Promise<void> {
-  // First login to get a session
-  const loginResponse = await fetch(`${API_BASE_URL}/api/auth/sign-in/email`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      email: 'test@example.com',
-      password: 'password123',
-    }),
-  });
-
-  if (!loginResponse.ok) {
-    throw new Error('Failed to login for admin setup');
+async function withDatabase<T>(fn: (pool: Pool) => Promise<T>): Promise<T> {
+  const pool = new Pool({ connectionString: DATABASE_URL });
+  try {
+    return await fn(pool);
+  } finally {
+    await pool.end();
   }
+}
 
-  // Get cookies from response
-  const cookies = loginResponse.headers.get('set-cookie');
-  
-  // Use the admin API to set role
-  const setRoleResponse = await fetch(`${API_BASE_URL}/api/auth/admin/set-role`, {
-    method: 'POST',
-    headers: { 
-      'Content-Type': 'application/json',
-      'Cookie': cookies || '',
-    },
-    body: JSON.stringify({
-      userId: 'test-user-id', // This will be fetched dynamically
-      role: 'admin',
-    }),
+async function ensureAdminFixtures(): Promise<void> {
+  await withDatabase(async (pool) => {
+    const adminResult = await pool.query<{ id: string }>(
+      `SELECT id FROM "user" WHERE email = $1`,
+      [TEST_USER.email],
+    );
+
+    if (adminResult.rowCount === 0) {
+      throw new Error(`Test admin user not found: ${TEST_USER.email}`);
+    }
+
+    const adminId = adminResult.rows[0].id;
+
+    await pool.query(
+      `UPDATE "user" SET role = 'admin', "emailVerified" = true WHERE id = $1`,
+      [adminId],
+    );
+
+    await pool.query(
+      `INSERT INTO organization (id, name, slug, "createdAt", metadata)
+       VALUES (gen_random_uuid()::text, $1, $2, NOW(), NULL)
+       ON CONFLICT (slug) DO NOTHING`,
+      ['E2E Admin Organization', AUX_ORG_SLUG],
+    );
+
+    const orgResult = await pool.query<{ id: string }>(
+      `SELECT id FROM organization WHERE slug = $1`,
+      [AUX_ORG_SLUG],
+    );
+
+    if (orgResult.rowCount === 0) {
+      throw new Error(`Failed to ensure organization fixture: ${AUX_ORG_SLUG}`);
+    }
+
+    const orgId = orgResult.rows[0].id;
+
+    const ensureUser = async (email: string, role: 'manager' | 'member', name: string) => {
+      const userResult = await pool.query<{ id: string }>(
+        `INSERT INTO "user" (id, name, email, role, "emailVerified", "createdAt", "updatedAt")
+         VALUES (gen_random_uuid()::text, $1, $2, $3, true, NOW(), NOW())
+         ON CONFLICT (email) DO UPDATE
+           SET role = EXCLUDED.role,
+               "emailVerified" = true,
+               "updatedAt" = NOW()
+         RETURNING id`,
+        [name, email, role],
+      );
+
+      const userId = userResult.rows[0].id;
+
+      await pool.query(
+        `INSERT INTO member (id, "organizationId", "userId", role, "createdAt")
+         VALUES (gen_random_uuid()::text, $1, $2, $3, NOW())
+         ON CONFLICT DO NOTHING`,
+        [orgId, userId, role],
+      );
+    };
+
+    await ensureUser(AUX_MEMBER_EMAIL, 'member', 'E2E Admin Member');
+    await ensureUser(AUX_MANAGER_EMAIL, 'manager', 'E2E Admin Manager');
+
+    await pool.query(`DELETE FROM session WHERE "userId" = $1`, [adminId]);
   });
-
-  // If this fails, we'll try via the test endpoint or just proceed
-  // The tests will verify admin access
 }
 
 // Helper to login
 async function login(page: import('@playwright/test').Page) {
   await page.goto('/login');
-  await page.getByLabel('Email').fill('test@example.com');
-  await page.getByLabel('Password').fill('password123');
+  await page.getByLabel('Email').fill(TEST_USER.email);
+  await page.getByLabel('Password').fill(TEST_USER.password);
   await page.getByRole('button', { name: /^login$/i }).click();
   await expect(page).toHaveURL('/', { timeout: 10000 });
 }
@@ -85,6 +128,9 @@ async function loginAsAdmin(page: import('@playwright/test').Page, adminPath: st
 }
 
 test.describe('Admin Panel E2E Tests', () => {
+  test.beforeAll(async () => {
+    await ensureAdminFixtures();
+  });
   
   test.describe('Basic Access', () => {
     test('should login and access dashboard', async ({ page }) => {
@@ -190,12 +236,14 @@ test.describe('Admin Panel E2E Tests', () => {
     test('should display member roles correctly in organization details', async ({ page }) => {
       await page.waitForLoadState('networkidle');
 
-      const orgButtons = page.locator('button').filter({ hasText: /^\// });
-      if ((await orgButtons.count()) > 0) {
-        await orgButtons.first().click();
-        await page.waitForTimeout(1000);
-        await expect(page.getByText(/members/i)).toBeVisible();
-      }
+      const targetOrg = page.getByRole('button', {
+        name: new RegExp(`/${AUX_ORG_SLUG}$`, 'i'),
+      });
+      await expect(targetOrg).toBeVisible({ timeout: 15000 });
+
+      await targetOrg.click();
+      await page.waitForTimeout(1000);
+      await expect(page.getByRole('heading', { name: /members/i })).toBeVisible();
     });
   });
 
@@ -356,16 +404,16 @@ test.describe('Admin Panel E2E Tests', () => {
       
       const rows = page.locator('table tbody tr');
       const rowCount = await rows.count();
-      
-      if (rowCount >= 2) {
-        // Select first user
-        await rows.nth(0).getByRole('checkbox').click();
-        await expect(page.getByRole('button', { name: /delete \(1\)/i })).toBeVisible();
-        
-        // Select second user
-        await rows.nth(1).getByRole('checkbox').click();
-        await expect(page.getByRole('button', { name: /delete \(2\)/i })).toBeVisible();
-      }
+
+      expect(rowCount).toBeGreaterThanOrEqual(2);
+
+      // Select first user
+      await rows.nth(0).getByRole('checkbox').click();
+      await expect(page.getByRole('button', { name: /delete \(1\)/i })).toBeVisible();
+
+      // Select second user
+      await rows.nth(1).getByRole('checkbox').click();
+      await expect(page.getByRole('button', { name: /delete \(2\)/i })).toBeVisible();
     });
 
     test('should deselect users when unchecking', async ({ page }) => {
@@ -394,19 +442,17 @@ test.describe('Admin Panel E2E Tests', () => {
       // Wait for organizations to load
       await page.waitForTimeout(1000);
       
-      // Check if there are any organizations
-      const orgButtons = page.locator('button').filter({ hasText: /^\// });
-      const hasOrgs = await orgButtons.count() > 0;
-      
-      if (hasOrgs) {
-        // Click on first organization
-        await orgButtons.first().click();
-        await page.waitForTimeout(500);
-        
-        // Look for edit button
-        const editButton = page.getByRole('button', { name: /edit/i });
-        await expect(editButton).toBeVisible();
-      }
+      const targetOrg = page.getByRole('button', {
+        name: new RegExp(`/${AUX_ORG_SLUG}$`, 'i'),
+      });
+      await expect(targetOrg).toBeVisible({ timeout: 15000 });
+
+      // Open organization actions menu and verify Edit action is available
+      const orgActionsButton = targetOrg.locator('button').first();
+      await orgActionsButton.click();
+
+      const editOption = page.getByRole('menuitem', { name: /edit/i });
+      await expect(editOption).toBeVisible();
     });
   });
 
@@ -483,30 +529,20 @@ test.describe('Admin Panel E2E Tests', () => {
       // Navigate to users page
       await page.goto('/admin/users');
       await page.waitForLoadState('networkidle');
+
+      const searchInput = page.getByPlaceholder(/search users/i);
+      await expect(searchInput).toBeVisible({ timeout: 10000 });
+      await searchInput.fill(AUX_MEMBER_EMAIL);
+      await page.waitForTimeout(800);
       
-      // Wait for table to load
-      await page.waitForSelector('table tbody tr');
-      
-      // Find a non-admin, non-self user (PR#7: admins can only change role on lower roles)
-      const rows = page.locator('table tbody tr');
-      const rowCount = await rows.count();
-      
-      for (let i = 0; i < rowCount; i++) {
-        const row = rows.nth(i);
-        const roleCell = await row.locator('td').nth(2).textContent();
-        
-        if (roleCell && (roleCell.includes('member') || roleCell.includes('manager'))) {
-          const actionButton = row.getByRole('button');
-          if (await actionButton.isVisible({ timeout: 1000 }).catch(() => false)) {
-            await actionButton.click();
-            await expect(page.getByRole('menuitem', { name: /change role/i })).toBeVisible();
-            await page.keyboard.press('Escape');
-            return;
-          }
-        }
-      }
-      // If no suitable user found, skip gracefully
-      console.log('⚠️ No non-admin user found to test role change');
+      // Wait for deterministic fixture row and open actions
+      const targetRow = page.locator('table tbody tr', { hasText: AUX_MEMBER_EMAIL }).first();
+      await expect(targetRow).toBeVisible({ timeout: 15000 });
+
+      const actionButton = targetRow.getByRole('button');
+      await actionButton.click();
+      await expect(page.getByRole('menuitem', { name: /change role/i })).toBeVisible();
+      await page.keyboard.press('Escape');
     });
 
     test('should persist permissions when assigned to a role', async ({ page }) => {
@@ -527,35 +563,36 @@ test.describe('Admin Panel E2E Tests', () => {
       // Check if there are any checkboxes (permissions loaded)
       const checkboxes = page.getByRole('checkbox');
       const checkboxCount = await checkboxes.count();
-      
-      // If permissions are loaded, try toggling one
-      if (checkboxCount > 0) {
-        // Get the first checkbox state
-        const firstCheckbox = checkboxes.first();
-        const wasChecked = await firstCheckbox.isChecked();
-        
-        // Toggle it
-        await firstCheckbox.click();
-        
-        // Save permissions
-        await page.getByRole('button', { name: /save permissions/i }).click();
-        
-        // Wait for dialog to close
-        await expect(page.getByRole('dialog')).not.toBeVisible({ timeout: 5000 });
-        
-        // Re-open the permissions dialog
-        await adminCard.getByRole('button', { name: /manage/i }).click();
-        await expect(page.getByRole('dialog')).toBeVisible();
-        await page.waitForTimeout(500);
-        
-        // Verify the permission state was persisted
-        const newState = await checkboxes.first().isChecked();
-        expect(newState).toBe(!wasChecked);
-        
-        // Restore original state
-        await checkboxes.first().click();
-        await page.getByRole('button', { name: /save permissions/i }).click();
-      }
+
+      expect(checkboxCount).toBeGreaterThan(0);
+
+      // Get the first checkbox state
+      const firstCheckbox = checkboxes.first();
+      const wasChecked = await firstCheckbox.isChecked();
+
+      // Toggle it
+      await firstCheckbox.click();
+
+      // Save permissions
+      await page.getByRole('button', { name: /save permissions/i }).click();
+
+      // Wait for dialog to close
+      await expect(page.getByRole('dialog')).not.toBeVisible({ timeout: 5000 });
+
+      // Re-open the permissions dialog
+      await adminCard.getByRole('button', { name: /manage/i }).click();
+      await expect(page.getByRole('dialog')).toBeVisible();
+      await page.waitForTimeout(500);
+
+      const reloadedCheckbox = page.getByRole('checkbox').first();
+
+      // Verify the permission state was persisted
+      const newState = await reloadedCheckbox.isChecked();
+      expect(newState).toBe(!wasChecked);
+
+      // Restore original state
+      await reloadedCheckbox.click();
+      await page.getByRole('button', { name: /save permissions/i }).click();
     });
   });
 });

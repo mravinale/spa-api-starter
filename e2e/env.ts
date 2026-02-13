@@ -1,4 +1,4 @@
-import { readFileSync } from 'fs';
+import { existsSync, readFileSync } from 'fs';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
 
@@ -29,7 +29,7 @@ function parseEnvFile(filePath: string): Record<string, string> {
 }
 
 const envTestPath = resolve(__dirname, '../../nestjs-api-starter/.env.test');
-const envVars = parseEnvFile(envTestPath);
+const envVars = existsSync(envTestPath) ? parseEnvFile(envTestPath) : {};
 
 /** Absolute path to .env.test — used by playwright.config.ts to tell the backend which env file to load */
 export const ENV_TEST_PATH = envTestPath;
@@ -38,16 +38,16 @@ export const ENV_TEST_PATH = envTestPath;
 export const ENV_VARS = envVars;
 
 /** PostgreSQL connection string from .env.test */
-export const DATABASE_URL = process.env.DATABASE_URL || envVars.DATABASE_URL;
+export const DATABASE_URL = process.env.E2E_DATABASE_URL || process.env.DATABASE_URL || envVars.DATABASE_URL;
 
 /** Backend base URL (e.g. http://localhost:3000) */
-export const API_BASE_URL = process.env.API_BASE_URL || envVars.BASE_URL || `http://localhost:${envVars.PORT || '3000'}`;
+export const API_BASE_URL = process.env.E2E_API_BASE_URL || process.env.API_BASE_URL || envVars.BASE_URL || `http://localhost:${envVars.PORT || '3000'}`;
 
 /** Frontend base URL */
-export const FE_URL = process.env.FE_URL || envVars.FE_URL || 'http://localhost:5173';
+export const FE_URL = process.env.E2E_FE_URL || process.env.FE_URL || envVars.FE_URL || 'http://localhost:5173';
 
 /** Pre-seeded test user credentials */
 export const TEST_USER = {
-  email: 'test@example.com',
-  password: 'password123',
+  email: process.env.E2E_TEST_USER_EMAIL || process.env.TEST_USER_EMAIL || 'test@example.com',
+  password: process.env.E2E_TEST_USER_PASSWORD || process.env.TEST_USER_PASSWORD || 'password123',
 };

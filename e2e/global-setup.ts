@@ -10,6 +10,12 @@ const TEST_USER_PASSWORD = TEST_USER.password;
  */
 async function globalSetup() {
   const databaseUrl = DATABASE_URL;
+
+  if (!databaseUrl) {
+    throw new Error(
+      'E2E setup failed: DATABASE_URL is missing. Set E2E_DATABASE_URL or provide DATABASE_URL in nestjs-api-starter/.env.test.',
+    );
+  }
   
   const pool = new Pool({
     connectionString: databaseUrl,
@@ -37,7 +43,9 @@ async function globalSetup() {
 
       if (!response.ok) {
         const error = await response.json().catch(() => ({}));
-        console.error('❌ Failed to create test user:', error);
+        throw new Error(
+          `Failed to create test user via ${API_BASE_URL}/api/auth/sign-up/email: ${JSON.stringify(error)}`,
+        );
       } else {
         console.log('✅ Test user created successfully');
       }
@@ -64,6 +72,7 @@ async function globalSetup() {
     }
   } catch (error) {
     console.error('❌ Failed to set up test user:', error);
+    throw error;
   } finally {
     await pool.end();
   }

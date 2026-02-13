@@ -264,15 +264,64 @@ await authClient.signOut();
 # All tests (headless)
 npm run test:e2e
 
+# List all discovered tests
+npm run test:e2e:list
+
 # Watch tests run (headed)
 npm run test:e2e:headed
 
 # Interactive UI
 npm run test:e2e:ui
 
-# View report
-npx playwright show-report
+# View HTML report manually (tests no longer auto-open/stick)
+npm run test:e2e:report
 ```
+
+### Run by Feature Section (faster local loop)
+
+```bash
+# Auth section
+npm run test:e2e:auth
+
+# Admin UI section
+npm run test:e2e:admin
+
+# RBAC + impersonation section
+npm run test:e2e:rbac
+
+# CRUD-heavy admin flows
+npm run test:e2e:full-crud
+
+# API-focused E2E checks
+npm run test:e2e:api
+```
+
+### Isolated E2E Mode (while you keep dev servers running)
+
+Use isolated ports and database so Playwright does not fight your local dev session:
+
+```bash
+# Full isolated suite
+npm run test:e2e:isolate
+
+# Isolated auth-only
+npm run test:e2e:isolate:auth
+
+# Isolated admin-only
+npm run test:e2e:isolate:admin
+```
+
+Isolated mode uses:
+- API: `http://127.0.0.1:3100`
+- Frontend: `http://127.0.0.1:4173`
+- DB: `postgresql://mravinale@localhost:5432/nestjs_api_starter_e2e`
+
+You can override these per run with:
+- `E2E_API_BASE_URL`
+- `E2E_FE_URL`
+- `E2E_DATABASE_URL`
+- `E2E_TEST_USER_EMAIL`
+- `E2E_TEST_USER_PASSWORD`
 
 ### Test Coverage
 

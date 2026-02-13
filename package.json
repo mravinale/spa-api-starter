@@ -11,9 +11,19 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "test:e2e": "playwright test",
-    "test:e2e:ui": "playwright test --ui",
-    "test:e2e:headed": "playwright test --headed"
+    "test:e2e": "E2E_API_BASE_URL=http://127.0.0.1:3100 E2E_FE_URL=http://127.0.0.1:4173 playwright test",
+    "test:e2e:report": "playwright show-report",
+    "test:e2e:ui": "E2E_API_BASE_URL=http://127.0.0.1:3100 E2E_FE_URL=http://127.0.0.1:4173 playwright test --ui",
+    "test:e2e:headed": "E2E_API_BASE_URL=http://127.0.0.1:3100 E2E_FE_URL=http://127.0.0.1:4173 playwright test --headed",
+    "test:e2e:list": "E2E_API_BASE_URL=http://127.0.0.1:3100 E2E_FE_URL=http://127.0.0.1:4173 playwright test --list",
+    "test:e2e:auth": "E2E_API_BASE_URL=http://127.0.0.1:3100 E2E_FE_URL=http://127.0.0.1:4173 playwright test e2e/auth.spec.ts",
+    "test:e2e:admin": "E2E_API_BASE_URL=http://127.0.0.1:3100 E2E_FE_URL=http://127.0.0.1:4173 playwright test e2e/admin.spec.ts",
+    "test:e2e:rbac": "E2E_API_BASE_URL=http://127.0.0.1:3100 E2E_FE_URL=http://127.0.0.1:4173 playwright test e2e/rbac-unified-roles.spec.ts e2e/rbac-impersonation.spec.ts",
+    "test:e2e:full-crud": "E2E_API_BASE_URL=http://127.0.0.1:3100 E2E_FE_URL=http://127.0.0.1:4173 playwright test e2e/full-coverage.spec.ts",
+    "test:e2e:api": "E2E_API_BASE_URL=http://127.0.0.1:3100 E2E_FE_URL=http://127.0.0.1:4173 playwright test e2e/health-api.spec.ts e2e/roles-api.spec.ts",
+    "test:e2e:isolate": "E2E_API_BASE_URL=http://127.0.0.1:3100 E2E_FE_URL=http://127.0.0.1:4173 E2E_DATABASE_URL=postgresql://mravinale@localhost:5432/nestjs_api_starter_e2e playwright test",
+    "test:e2e:isolate:auth": "E2E_API_BASE_URL=http://127.0.0.1:3100 E2E_FE_URL=http://127.0.0.1:4173 E2E_DATABASE_URL=postgresql://mravinale@localhost:5432/nestjs_api_starter_e2e E2E_TEST_USER_EMAIL=e2e-auth@example.com E2E_TEST_USER_PASSWORD=password123 playwright test e2e/auth.spec.ts",
+    "test:e2e:isolate:admin": "E2E_API_BASE_URL=http://127.0.0.1:3100 E2E_FE_URL=http://127.0.0.1:4173 E2E_DATABASE_URL=postgresql://mravinale@localhost:5432/nestjs_api_starter_e2e E2E_TEST_USER_EMAIL=e2e-admin@example.com E2E_TEST_USER_PASSWORD=password123 playwright test e2e/admin.spec.ts"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
