@@ -463,34 +463,32 @@ test.describe('Manager Role - Organization-Scoped Access', () => {
 
     // Click on an organization to see its members
     const orgButtons = page.locator('button').filter({ hasText: /^\// });
-    if ((await orgButtons.count()) > 0) {
-      await orgButtons.first().click();
-      await page.waitForTimeout(2000);
-    }
+    expect(await orgButtons.count()).toBeGreaterThan(0);
+    await orgButtons.first().click();
+    await page.waitForTimeout(2000);
 
     // Find a member row with a role dropdown (Select trigger)
     const roleSelects = page.locator('table td button[data-slot="select-trigger"]')
       .or(page.locator('table td [role="combobox"]'));
     const selectCount = await roleSelects.count();
+    expect(selectCount).toBeGreaterThan(0);
 
-    if (selectCount > 0) {
-      // Click the first role dropdown
-      await roleSelects.first().click();
-      await page.waitForTimeout(500);
+    // Click the first role dropdown
+    await roleSelects.first().click();
+    await page.waitForTimeout(500);
 
-      // Check dropdown options — Admin should NOT be visible for a manager
-      const adminOption = page.getByRole('option', { name: /^admin$/i });
-      await expect(adminOption).not.toBeVisible();
+    // Check dropdown options — Admin should NOT be visible for a manager
+    const adminOption = page.getByRole('option', { name: /^admin$/i });
+    await expect(adminOption).not.toBeVisible();
 
-      // Manager and Member should be visible
-      const managerOption = page.getByRole('option', { name: /^manager$/i });
-      const memberOption = page.getByRole('option', { name: /^member$/i });
-      const managerVisible = await managerOption.isVisible().catch(() => false);
-      const memberVisible = await memberOption.isVisible().catch(() => false);
-      expect(managerVisible || memberVisible).toBeTruthy();
+    // Manager and Member should be visible
+    const managerOption = page.getByRole('option', { name: /^manager$/i });
+    const memberOption = page.getByRole('option', { name: /^member$/i });
+    const managerVisible = await managerOption.isVisible().catch(() => false);
+    const memberVisible = await memberOption.isVisible().catch(() => false);
+    expect(managerVisible || memberVisible).toBeTruthy();
 
-      await page.keyboard.press('Escape');
-    }
+    await page.keyboard.press('Escape');
   });
 
   test('manager should NOT see Admin role in Add Member dialog', async ({ page }) => {
@@ -499,35 +497,32 @@ test.describe('Manager Role - Organization-Scoped Access', () => {
 
     // Click on an organization
     const orgButtons = page.locator('button').filter({ hasText: /^\// });
-    if ((await orgButtons.count()) > 0) {
-      await orgButtons.first().click();
-      await page.waitForTimeout(2000);
-    }
+    expect(await orgButtons.count()).toBeGreaterThan(0);
+    await orgButtons.first().click();
+    await page.waitForTimeout(2000);
 
     // Click "Add Member" button
     const addMemberBtn = page.getByRole('button', { name: /add member/i });
-    if (await addMemberBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await addMemberBtn.click();
-      await expect(page.getByRole('dialog')).toBeVisible({ timeout: 5000 });
+    await expect(addMemberBtn).toBeVisible({ timeout: 3000 });
+    await addMemberBtn.click();
+    await expect(page.getByRole('dialog')).toBeVisible({ timeout: 5000 });
 
-      // Open the Role select in the dialog
-      const dialog = page.getByRole('dialog');
-      const roleSelect = dialog.locator('[role="combobox"]').last()
-        .or(dialog.locator('button[data-slot="select-trigger"]').last());
-      if (await roleSelect.isVisible({ timeout: 2000 }).catch(() => false)) {
-        await roleSelect.click();
-        await page.waitForTimeout(500);
+    // Open the Role select in the dialog
+    const dialog = page.getByRole('dialog');
+    const roleSelect = dialog.locator('[role="combobox"]').last()
+      .or(dialog.locator('button[data-slot="select-trigger"]').last());
+    await expect(roleSelect).toBeVisible({ timeout: 2000 });
+    await roleSelect.click();
+    await page.waitForTimeout(500);
 
-        // Admin should NOT be an option for a manager
-        const adminOption = page.getByRole('option', { name: /^admin$/i });
-        await expect(adminOption).not.toBeVisible();
+    // Admin should NOT be an option for a manager
+    const adminOption = page.getByRole('option', { name: /^admin$/i });
+    await expect(adminOption).not.toBeVisible();
 
-        await page.keyboard.press('Escape');
-      }
+    await page.keyboard.press('Escape');
 
-      // Close dialog
-      await page.keyboard.press('Escape');
-    }
+    // Close dialog
+    await page.keyboard.press('Escape');
   });
 });
 
