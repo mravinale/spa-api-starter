@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
 import { type ColumnDef } from "@tanstack/react-table"
 import {
   IconDotsVertical,
@@ -57,7 +57,32 @@ import {
 import { Checkbox } from "@/shared/components/ui/checkbox"
 import { useAuth } from "@/shared/context/AuthContext"
 import type { AdminUser, UserFilterParams } from "../types"
-import { adminService } from "../services/adminService"
+import { adminService, type UserCapabilities } from "../services/adminService"
+
+function getFallbackUserActions(
+  actorRole: string,
+  targetRole: string,
+  isSelf: boolean,
+): UserCapabilities["actions"] {
+  const canMutateNonSelf = !isSelf && (
+    actorRole === "admin"
+      ? targetRole !== "admin"
+      : actorRole === "manager"
+        ? targetRole === "member"
+        : false
+  )
+
+  return {
+    update: isSelf || canMutateNonSelf,
+    setRole: canMutateNonSelf,
+    ban: canMutateNonSelf,
+    unban: canMutateNonSelf,
+    setPassword: isSelf || canMutateNonSelf,
+    remove: canMutateNonSelf,
+    revokeSessions: canMutateNonSelf,
+    impersonate: canMutateNonSelf,
+  }
+}
 
 export function UsersPage() {
   // Pagination and filter state
@@ -85,6 +110,7 @@ export function UsersPage() {
   const [banReason, setBanReason] = useState("")
   const [newRole, setNewRole] = useState("user")
   const [newPassword, setNewPassword] = useState("")
+  const [capabilitiesByUserId, setCapabilitiesByUserId] = useState<Record<string, UserCapabilities["actions"]>>({})
 
   const [createMeta, setCreateMeta] = useState<null | {
     roles: Array<{ name: string; displayName: string }>
@@ -123,6 +149,43 @@ export function UsersPage() {
   const removeUser = useRemoveUser()
   const removeUsers = useRemoveUsers()
   const impersonateUser = useImpersonateUser()
+
+  useEffect(() => {
+    let mounted = true
+    const users = data?.data ?? []
+
+    if (users.length === 0) {
+      setCapabilitiesByUserId({})
+      return () => {
+        mounted = false
+      }
+    }
+
+    const loadCapabilities = async () => {
+      const entries = await Promise.all(
+        users.map(async (user) => {
+          try {
+            const capabilities = await adminService.getUserCapabilities(user.id)
+            return [user.id, capabilities.actions] as const
+          } catch {
+            const isSelf = user.id === currentUser?.id
+            const targetRole = user.role || "member"
+            return [user.id, getFallbackUserActions(currentUser?.role || "member", targetRole, isSelf)] as const
+          }
+        }),
+      )
+
+      if (mounted) {
+        setCapabilitiesByUserId(Object.fromEntries(entries))
+      }
+    }
+
+    void loadCapabilities()
+
+    return () => {
+      mounted = false
+    }
+  }, [data?.data, currentUser?.id, currentUser?.role])
 
   // Handlers
   const handleCreateUser = async () => {
@@ -375,21 +438,25 @@ export function UsersPage() {
       id: "actions",
       cell: ({ row }) => {
         const user = row.original
-        const myRole = currentUser?.role || "member"
         const isSelf = user.id === currentUser?.id
         const targetRole = user.role || "member"
+        const actions = capabilitiesByUserId[user.id] ?? getFallbackUserActions(currentUser?.role || "member", targetRole, isSelf)
 
-        // Determine allowed actions based on role hierarchy:
-        // admin → all actions on managers/members, edit-only on self, no actions on other admins
-        // manager → all actions on members, edit-only on self, no actions on admins/other managers
-        const canEditOnly = isSelf
-        const canDoFullActions = (() => {
-          if (isSelf) return false
-          if (myRole === "admin") return targetRole !== "admin"
-          if (myRole === "manager") return targetRole === "member"
-          return false
-        })()
-        const hasAnyAction = canEditOnly || canDoFullActions
+        const canUpdate = actions.update
+        const canSetRole = actions.setRole
+        const canSetPassword = actions.setPassword
+        const canBan = actions.ban
+        const canUnban = actions.unban
+        const canRemove = actions.remove
+        const canImpersonate = actions.impersonate
+        const hasAnyAction =
+          canUpdate ||
+          canSetRole ||
+          canSetPassword ||
+          canBan ||
+          canUnban ||
+          canRemove ||
+          canImpersonate
 
         if (!hasAnyAction) return null
 
@@ -408,11 +475,12 @@ export function UsersPage() {
                   setEditUserData({ name: user.name || "" })
                   setEditDialogOpen(true)
                 }}
+                disabled={!canUpdate}
               >
                 <IconEdit className="mr-2 h-4 w-4" />
                 Edit User
               </DropdownMenuItem>
-              {isSelf && (myRole === "admin" || myRole === "manager") && (
+              {canSetPassword && (
                 <DropdownMenuItem
                   onClick={() => {
                     setSelectedUser(user)
@@ -423,57 +491,58 @@ export function UsersPage() {
                   Reset Password
                 </DropdownMenuItem>
               )}
-              {canDoFullActions && (
+              {(canSetRole || canImpersonate || canBan || canUnban || canRemove) && (
                 <>
-                  <DropdownMenuItem
-                    onClick={() => handleOpenRoleDialog(user)}
-                  >
-                    <IconShield className="mr-2 h-4 w-4" />
-                    Change Role
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onClick={() => {
-                      setSelectedUser(user)
-                      setPasswordDialogOpen(true)
-                    }}
-                  >
-                    <IconKey className="mr-2 h-4 w-4" />
-                    Reset Password
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onClick={() => handleImpersonateUser(user)}
-                  >
-                    <IconUserScan className="mr-2 h-4 w-4" />
-                    Impersonate User
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  {user.banned ? (
-                    <DropdownMenuItem onClick={() => handleUnbanUser(user)}>
-                      <IconCheck className="mr-2 h-4 w-4" />
-                      Unban User
-                    </DropdownMenuItem>
-                  ) : (
+                  {canSetRole && (
                     <DropdownMenuItem
-                      onClick={() => {
-                        setSelectedUser(user)
-                        setBanDialogOpen(true)
-                      }}
+                      onClick={() => handleOpenRoleDialog(user)}
                     >
-                      <IconBan className="mr-2 h-4 w-4" />
-                      Ban User
+                      <IconShield className="mr-2 h-4 w-4" />
+                      Change Role
                     </DropdownMenuItem>
                   )}
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem
-                    className="text-destructive"
-                    onClick={() => {
-                      setSelectedUser(user)
-                      setDeleteDialogOpen(true)
-                    }}
-                  >
-                    <IconTrash className="mr-2 h-4 w-4" />
-                    Delete User
-                  </DropdownMenuItem>
+                  {canImpersonate && (
+                    <DropdownMenuItem
+                      onClick={() => handleImpersonateUser(user)}
+                    >
+                      <IconUserScan className="mr-2 h-4 w-4" />
+                      Impersonate User
+                    </DropdownMenuItem>
+                  )}
+                  {(canBan || canUnban) && <DropdownMenuSeparator />}
+                  {user.banned ? (
+                    canUnban && (
+                      <DropdownMenuItem onClick={() => handleUnbanUser(user)}>
+                        <IconCheck className="mr-2 h-4 w-4" />
+                        Unban User
+                      </DropdownMenuItem>
+                    )
+                  ) : (
+                    canBan && (
+                      <DropdownMenuItem
+                        onClick={() => {
+                          setSelectedUser(user)
+                          setBanDialogOpen(true)
+                        }}
+                      >
+                        <IconBan className="mr-2 h-4 w-4" />
+                        Ban User
+                      </DropdownMenuItem>
+                    )
+                  )}
+                  {canRemove && <DropdownMenuSeparator />}
+                  {canRemove && (
+                    <DropdownMenuItem
+                      className="text-destructive"
+                      onClick={() => {
+                        setSelectedUser(user)
+                        setDeleteDialogOpen(true)
+                      }}
+                    >
+                      <IconTrash className="mr-2 h-4 w-4" />
+                      Delete User
+                    </DropdownMenuItem>
+                  )}
                 </>
               )}
             </DropdownMenuContent>
@@ -481,7 +550,7 @@ export function UsersPage() {
         )
       },
     },
-  ], [currentUser])
+  ], [currentUser, capabilitiesByUserId])
 
   return (
     <div className="flex flex-1 flex-col gap-4 p-4 lg:p-6">

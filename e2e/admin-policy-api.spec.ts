@@ -1,0 +1,203 @@
+import { test, expect } from '@playwright/test';
+import { Pool } from 'pg';
+import { API_BASE_URL, DATABASE_URL, TEST_USER } from './env';
+
+async function withDatabase<T>(fn: (pool: Pool) => Promise<T>): Promise<T> {
+  const pool = new Pool({ connectionString: DATABASE_URL });
+  try {
+    return await fn(pool);
+  } finally {
+    await pool.end();
+  }
+}
+
+async function signInAndGetHeaders(request: import('@playwright/test').APIRequestContext): Promise<Record<string, string>> {
+  const signInRes = await request.post(`${API_BASE_URL}/api/auth/sign-in/email`, {
+    data: { email: TEST_USER.email, password: TEST_USER.password },
+  });
+
+  expect(signInRes.status()).toBe(200);
+  const signInData = await signInRes.json();
+  const token = signInData.token || signInData.session?.token;
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+async function ensureAdminActor(): Promise<string> {
+  return withDatabase(async (pool) => {
+    const userResult = await pool.query<{ id: string }>(
+      `SELECT id FROM "user" WHERE email = $1`,
+      [TEST_USER.email],
+    );
+
+    if (userResult.rowCount === 0) {
+      throw new Error(`Test user not found: ${TEST_USER.email}`);
+    }
+
+    const userId = userResult.rows[0].id;
+
+    await pool.query(
+      `UPDATE "user" SET role = 'admin', "emailVerified" = true, "updatedAt" = NOW() WHERE id = $1`,
+      [userId],
+    );
+
+    return userId;
+  });
+}
+
+async function ensureUser(email: string, name: string, role: 'admin' | 'manager' | 'member'): Promise<string> {
+  return withDatabase(async (pool) => {
+    const result = await pool.query<{ id: string }>(
+      `INSERT INTO "user" (id, name, email, role, "emailVerified", "createdAt", "updatedAt")
+       VALUES (gen_random_uuid()::text, $1, $2, $3, true, NOW(), NOW())
+       ON CONFLICT (email) DO UPDATE
+         SET role = EXCLUDED.role,
+             name = EXCLUDED.name,
+             "emailVerified" = true,
+             "updatedAt" = NOW()
+       RETURNING id`,
+      [name, email, role],
+    );
+
+    return result.rows[0].id;
+  });
+}
+
+async function createOrganization(slug: string, name: string): Promise<string> {
+  return withDatabase(async (pool) => {
+    await pool.query(
+      `INSERT INTO organization (id, name, slug, "createdAt", metadata)
+       VALUES (gen_random_uuid()::text, $1, $2, NOW(), NULL)
+       ON CONFLICT (slug) DO UPDATE SET name = EXCLUDED.name
+       RETURNING id`,
+      [name, slug],
+    );
+
+    const orgResult = await pool.query<{ id: string }>(
+      `SELECT id FROM organization WHERE slug = $1`,
+      [slug],
+    );
+
+    if (orgResult.rowCount === 0) {
+      throw new Error(`Failed to create org with slug ${slug}`);
+    }
+
+    return orgResult.rows[0].id;
+  });
+}
+
+async function ensureMember(organizationId: string, userId: string, role: 'admin' | 'manager' | 'member'): Promise<string> {
+  return withDatabase(async (pool) => {
+    const existing = await pool.query<{ id: string }>(
+      `SELECT id FROM member WHERE "organizationId" = $1 AND "userId" = $2`,
+      [organizationId, userId],
+    );
+
+    if (existing.rowCount && existing.rows[0]) {
+      await pool.query(`UPDATE member SET role = $1 WHERE id = $2`, [role, existing.rows[0].id]);
+      return existing.rows[0].id;
+    }
+
+    const result = await pool.query<{ id: string }>(
+      `INSERT INTO member (id, "organizationId", "userId", role, "createdAt")
+       VALUES (gen_random_uuid()::text, $1, $2, $3, NOW())
+       RETURNING id`,
+      [organizationId, userId, role],
+    );
+
+    return result.rows[0].id;
+  });
+}
+
+test.describe('Admin policy API coverage', () => {
+  test.beforeAll(async () => {
+    await ensureAdminActor();
+  });
+
+  test('GET /api/password-policy should expose backend policy', async ({ request }) => {
+    const response = await request.get(`${API_BASE_URL}/api/password-policy`);
+    expect(response.status()).toBe(200);
+
+    const body = await response.json();
+    expect(body).toEqual({ minLength: 8 });
+  });
+
+  test('GET /api/admin/users/:id/capabilities should return backend-driven action matrix', async ({ request }) => {
+    const headers = await signInAndGetHeaders(request);
+
+    const targetMemberId = await ensureUser(
+      `e2e-cap-member-${Date.now()}@example.com`,
+      'E2E Cap Member',
+      'member',
+    );
+    const targetAdminId = await ensureUser(
+      `e2e-cap-admin-${Date.now()}@example.com`,
+      'E2E Cap Admin',
+      'admin',
+    );
+
+    const memberResponse = await request.get(`${API_BASE_URL}/api/admin/users/${targetMemberId}/capabilities`, { headers });
+    expect(memberResponse.status()).toBe(200);
+    const memberBody = await memberResponse.json();
+    expect(memberBody.actions.update).toBe(true);
+    expect(memberBody.actions.remove).toBe(true);
+    expect(memberBody.actions.impersonate).toBe(true);
+
+    const adminResponse = await request.get(`${API_BASE_URL}/api/admin/users/${targetAdminId}/capabilities`, { headers });
+    expect(adminResponse.status()).toBe(200);
+    const adminBody = await adminResponse.json();
+    expect(adminBody.actions.setRole).toBe(false);
+    expect(adminBody.actions.remove).toBe(false);
+    expect(adminBody.actions.impersonate).toBe(false);
+  });
+
+  test('organization member last-admin protections should be enforced by API', async ({ request }) => {
+    const headers = await signInAndGetHeaders(request);
+
+    const suffix = Date.now();
+    const orgId = await createOrganization(`e2e-policy-org-${suffix}`, `E2E Policy Org ${suffix}`);
+    const loneAdminUserId = await ensureUser(`e2e-last-admin-${suffix}@example.com`, 'E2E Last Admin', 'member');
+    const loneAdminMemberId = await ensureMember(orgId, loneAdminUserId, 'admin');
+
+    const demoteResponse = await request.put(
+      `${API_BASE_URL}/api/platform-admin/organizations/${orgId}/members/${loneAdminMemberId}/role`,
+      {
+        headers,
+        data: { role: 'member' },
+      },
+    );
+    expect(demoteResponse.status()).toBe(403);
+
+    const removeResponse = await request.delete(
+      `${API_BASE_URL}/api/platform-admin/organizations/${orgId}/members/${loneAdminMemberId}`,
+      { headers },
+    );
+    expect(removeResponse.status()).toBe(403);
+  });
+
+  test('organization invitation lifecycle should use platform-admin endpoints', async ({ request }) => {
+    const headers = await signInAndGetHeaders(request);
+
+    const suffix = Date.now();
+    const orgId = await createOrganization(`e2e-invite-org-${suffix}`, `E2E Invite Org ${suffix}`);
+    const inviteEmail = `e2e-invitee-${suffix}@example.com`;
+
+    const createInviteResponse = await request.post(
+      `${API_BASE_URL}/api/platform-admin/organizations/${orgId}/invitations`,
+      {
+        headers,
+        data: { email: inviteEmail, role: 'member' },
+      },
+    );
+    expect([200, 201]).toContain(createInviteResponse.status());
+
+    const createdInvitationBody = await createInviteResponse.json();
+    const invitationId = createdInvitationBody?.data?.id as string | undefined;
+    expect(invitationId).toBeTruthy();
+
+    const deleteInviteResponse = await request.delete(
+      `${API_BASE_URL}/api/platform-admin/organizations/${orgId}/invitations/${invitationId}`,
+      { headers },
+    );
+    expect(deleteInviteResponse.status()).toBe(200);
+  });
+});

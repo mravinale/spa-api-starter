@@ -8,6 +8,7 @@ import {
   useBanUser,
   useUnbanUser,
   useSetUserRole,
+  useUserCapabilities,
   userKeys,
 } from '../useUsers';
 import { adminService } from '../../services/adminService';
@@ -20,6 +21,7 @@ vi.mock('../../services/adminService', () => ({
     banUser: vi.fn(),
     unbanUser: vi.fn(),
     setRole: vi.fn(),
+    getUserCapabilities: vi.fn(),
     setPassword: vi.fn(),
     removeUser: vi.fn(),
     listUserSessions: vi.fn(),
@@ -37,6 +39,7 @@ const mockAdminService = adminService as unknown as {
   banUser: Mock
   unbanUser: Mock
   setRole: Mock
+  getUserCapabilities: Mock
 };
 
 // Create a wrapper with QueryClientProvider
@@ -204,6 +207,43 @@ describe('useSetUserRole hook', () => {
   });
 });
 
+describe('useUserCapabilities hook', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('should fetch capabilities successfully', async () => {
+    const capabilities = {
+      targetUserId: '1',
+      targetRole: 'member',
+      isSelf: false,
+      actions: {
+        update: true,
+        setRole: true,
+        ban: true,
+        unban: true,
+        setPassword: true,
+        remove: true,
+        revokeSessions: true,
+        impersonate: true,
+      },
+    };
+
+    mockAdminService.getUserCapabilities.mockResolvedValue(capabilities);
+
+    const { result } = renderHook(() => useUserCapabilities('1'), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => {
+      expect(result.current.isSuccess).toBe(true);
+    });
+
+    expect(mockAdminService.getUserCapabilities).toHaveBeenCalledWith('1');
+    expect(result.current.data).toEqual(capabilities);
+  });
+});
+
 describe('userKeys', () => {
   it('should generate correct query keys', () => {
     expect(userKeys.all).toEqual(['users']);
@@ -212,5 +252,6 @@ describe('userKeys', () => {
     expect(userKeys.details()).toEqual(['users', 'detail']);
     expect(userKeys.detail('1')).toEqual(['users', 'detail', '1']);
     expect(userKeys.sessions('1')).toEqual(['users', 'sessions', '1']);
+    expect(userKeys.capabilities('1')).toEqual(['users', 'capabilities', '1']);
   });
 });
