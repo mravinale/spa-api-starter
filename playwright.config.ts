@@ -50,7 +50,7 @@ export default defineConfig({
       env: {
         DOTENV_CONFIG_PATH: ENV_TEST_PATH,
         PORT: String(apiPort),
-        DATABASE_URL,
+        ...(DATABASE_URL ? { DATABASE_URL } : {}),
         BASE_URL: API_BASE_URL,
         FE_URL,
         TRUSTED_ORIGINS: `${FE_URL},http://localhost:${fePort},http://127.0.0.1:${fePort}`,
