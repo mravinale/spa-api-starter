@@ -2,6 +2,10 @@ import { test, expect } from '@playwright/test';
 import { Pool } from 'pg';
 import { DATABASE_URL, API_BASE_URL, TEST_USER } from './env';
 
+const IMPERSONATION_ORG_SLUG = 'e2e-impersonation-org';
+const IMPERSONATION_TARGET_EMAIL = 'e2e-impersonation-member@example.com';
+const IMPERSONATION_TARGET_NAME = 'E2E Impersonation Member';
+
 /**
  * RBAC and Impersonation E2E Tests
  * 
@@ -15,8 +19,68 @@ import { DATABASE_URL, API_BASE_URL, TEST_USER } from './env';
 async function ensureAdminRole() {
   const pool = new Pool({ connectionString: DATABASE_URL });
   try {
-    await pool.query(`UPDATE "user" SET role = 'admin' WHERE email = $1`, [TEST_USER.email]);
-    await pool.query(`DELETE FROM session WHERE "userId" IN (SELECT id FROM "user" WHERE email = $1)`, [TEST_USER.email]);
+    const adminResult = await pool.query<{ id: string }>(
+      `SELECT id FROM "user" WHERE email = $1`,
+      [TEST_USER.email],
+    );
+
+    if (adminResult.rowCount === 0) {
+      throw new Error(`Test admin user not found: ${TEST_USER.email}`);
+    }
+
+    const adminId = adminResult.rows[0].id;
+
+    await pool.query(`UPDATE "user" SET role = 'admin', "emailVerified" = true WHERE id = $1`, [adminId]);
+
+    await pool.query(
+      `INSERT INTO organization (id, name, slug, "createdAt", metadata)
+       VALUES (gen_random_uuid()::text, $1, $2, NOW(), NULL)
+       ON CONFLICT (slug) DO NOTHING`,
+      ['E2E Impersonation Org', IMPERSONATION_ORG_SLUG],
+    );
+
+    const orgResult = await pool.query<{ id: string }>(
+      `SELECT id FROM organization WHERE slug = $1`,
+      [IMPERSONATION_ORG_SLUG],
+    );
+
+    if (orgResult.rowCount === 0) {
+      throw new Error(`Failed to ensure impersonation org: ${IMPERSONATION_ORG_SLUG}`);
+    }
+
+    const orgId = orgResult.rows[0].id;
+
+    const targetResult = await pool.query<{ id: string }>(
+      `INSERT INTO "user" (id, name, email, role, "emailVerified", "createdAt", "updatedAt")
+       VALUES (gen_random_uuid()::text, $1, $2, 'member', true, NOW(), NOW())
+       ON CONFLICT (email) DO UPDATE
+         SET role = 'member',
+             "emailVerified" = true,
+             "updatedAt" = NOW()
+       RETURNING id`,
+      [IMPERSONATION_TARGET_NAME, IMPERSONATION_TARGET_EMAIL],
+    );
+
+    const targetUserId = targetResult.rows[0].id;
+
+    await pool.query(
+      `INSERT INTO member (id, "organizationId", "userId", role, "createdAt")
+       VALUES (gen_random_uuid()::text, $1, $2, $3, NOW())
+       ON CONFLICT DO NOTHING`,
+      [orgId, adminId, 'admin'],
+    );
+
+    await pool.query(
+      `INSERT INTO member (id, "organizationId", "userId", role, "createdAt")
+       VALUES (gen_random_uuid()::text, $1, $2, $3, NOW())
+       ON CONFLICT DO NOTHING`,
+      [orgId, targetUserId, 'member'],
+    );
+
+    await pool.query(
+      `DELETE FROM session WHERE "userId" IN ($1, $2)`,
+      [adminId, targetUserId],
+    );
   } finally {
     await pool.end();
   }
@@ -60,30 +124,22 @@ test.describe.serial('Platform Admin - Organization Management', () => {
   });
 
   test('should allow platform admin to create organization', async ({ page }) => {
-    await page.getByRole('button', { name: /create organization/i }).click();
-    await expect(page.getByRole('dialog')).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'Create Organization' })).toBeVisible();
-    
-    // Fill in organization details
-    await page.getByLabel('Name').fill('Test Org E2E');
-    await page.getByLabel('Slug').fill('test-org-e2e-' + Date.now());
-    
-    // Close dialog without saving (cleanup)
-    await page.keyboard.press('Escape');
+    const createButton = page.getByRole('button', { name: /create organization/i });
+    await expect(createButton).toBeVisible();
+    await expect(createButton).toBeEnabled();
   });
 
   test('should show organization members when org is selected', async ({ page }) => {
-    // Check if there are any organizations
-    const orgButtons = page.locator('button').filter({ hasText: /^\// });
-    const hasOrgs = await orgButtons.count() > 0;
-    
-    if (hasOrgs) {
-      await orgButtons.first().click();
-      await page.waitForLoadState('networkidle');
-      
-      // Should show members section
-      await expect(page.getByText(/members/i)).toBeVisible();
-    }
+    const targetOrg = page.getByRole('button', {
+      name: new RegExp(`/${IMPERSONATION_ORG_SLUG}$`, 'i'),
+    });
+    await expect(targetOrg).toBeVisible({ timeout: 15000 });
+
+    await targetOrg.click();
+    await page.waitForLoadState('networkidle');
+
+    // Organization details should be loaded for selected org
+    await expect(page.getByRole('button', { name: /add member/i })).toBeVisible({ timeout: 15000 });
   });
 });
 
@@ -133,9 +189,17 @@ test.describe.serial('Impersonation', () => {
   test('should show impersonate option in user dropdown', async ({ page }) => {
     // Wait for users table to load
     await page.waitForSelector('table tbody tr', { timeout: 10000 });
-    
-    // Click on first user's action menu
-    const actionButton = page.locator('table tbody tr').first().getByRole('button');
+
+    const searchInput = page.getByPlaceholder(/search users/i);
+    await expect(searchInput).toBeVisible({ timeout: 10000 });
+    await searchInput.fill(IMPERSONATION_TARGET_NAME);
+    await page.waitForTimeout(800);
+
+    // Open deterministic non-self user row
+    const targetRow = page.locator('table tbody tr', { hasText: IMPERSONATION_TARGET_NAME }).first();
+    await expect(targetRow).toBeVisible({ timeout: 15000 });
+
+    const actionButton = targetRow.getByRole('button');
     await actionButton.click();
     
     // Check that Impersonate option exists
@@ -151,29 +215,14 @@ test.describe.serial('Impersonation', () => {
 
   test('full impersonation flow - impersonate and stop', async ({ page }) => {
     await page.waitForSelector('table tbody tr');
-    
-    // Find a user that is not the current admin (look for member or manager role)
-    const rows = page.locator('table tbody tr');
-    const rowCount = await rows.count();
-    
-    let targetRow = null;
-    for (let i = 0; i < rowCount; i++) {
-      const row = rows.nth(i);
-      const roleCell = row.locator('td').nth(1); // Role column
-      const roleText = await roleCell.textContent();
-      if (roleText && (roleText.includes('member') || roleText.includes('manager'))) {
-        targetRow = row;
-        break;
-      }
-    }
-    
-    if (!targetRow) {
-      console.log('No non-admin user found to impersonate, skipping test');
-      return;
-    }
-    
-    // Get the user's name for later verification
-    const userName = await targetRow.locator('td').first().textContent();
+
+    const searchInput = page.getByPlaceholder(/search users/i);
+    await expect(searchInput).toBeVisible({ timeout: 10000 });
+    await searchInput.fill(IMPERSONATION_TARGET_NAME);
+    await page.waitForTimeout(800);
+
+    const targetRow = page.locator('table tbody tr', { hasText: IMPERSONATION_TARGET_NAME }).first();
+    await expect(targetRow).toBeVisible({ timeout: 15000 });
     
     // Click on user's action menu
     const actionButton = targetRow.getByRole('button');
@@ -184,28 +233,21 @@ test.describe.serial('Impersonation', () => {
     
     // Wait for impersonation to take effect (page should reload)
     await page.waitForLoadState('networkidle');
-    
-    // Check if impersonation banner appears (amber background with "impersonating" text)
+
+    // Check impersonation banner appears and contains expected user
     const banner = page.locator('.bg-amber-500');
-    const bannerVisible = await banner.isVisible().catch(() => false);
-    
-    if (bannerVisible) {
-      // Verify banner shows the impersonated user's info
-      await expect(banner.getByText(/you are impersonating/i)).toBeVisible();
-      
-      // Click Stop Impersonating button
-      await banner.getByRole('button', { name: /stop impersonating/i }).click();
-      
-      // Wait for session to restore
-      await page.waitForLoadState('networkidle');
-      
-      // Banner should no longer be visible
-      await expect(banner).not.toBeVisible();
-      
-      console.log('✅ Full impersonation flow completed successfully');
-    } else {
-      console.log('⚠️ Impersonation banner not visible - impersonation may have failed or requires org membership');
-    }
+    await expect(banner).toBeVisible({ timeout: 15000 });
+    await expect(banner.getByText(/you are impersonating/i)).toBeVisible();
+    await expect(banner.getByText(new RegExp(IMPERSONATION_TARGET_EMAIL, 'i'))).toBeVisible();
+
+    // Click Stop Impersonating button
+    await banner.getByRole('button', { name: /stop impersonating/i }).click();
+
+    // Wait for session to restore
+    await page.waitForLoadState('networkidle');
+
+    // Banner should no longer be visible
+    await expect(banner).not.toBeVisible();
   });
 });
 

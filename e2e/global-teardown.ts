@@ -9,6 +9,12 @@ const TEST_USER_EMAIL = TEST_USER.email;
  */
 async function globalTeardown() {
   const databaseUrl = DATABASE_URL;
+
+  if (!databaseUrl) {
+    throw new Error(
+      'E2E teardown failed: DATABASE_URL is missing. Set E2E_DATABASE_URL or provide DATABASE_URL in nestjs-api-starter/.env.test.',
+    );
+  }
   
   const pool = new Pool({
     connectionString: databaseUrl,
@@ -44,6 +50,7 @@ async function globalTeardown() {
     console.log(`🧹 Cleaned up test user: ${TEST_USER_EMAIL}`);
   } catch (error) {
     console.error('❌ Failed to clean up test user:', error);
+    throw error;
   } finally {
     await pool.end();
   }

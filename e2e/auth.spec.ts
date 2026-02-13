@@ -83,11 +83,10 @@ test.describe('Authentication E2E Tests', () => {
     });
 
     test('should successfully login with verified user', async ({ page }) => {
-      // Use the pre-verified test user from the database
-      // (test@example.com was verified manually during setup)
+      // Use the pre-verified test user from setup/global hooks
       const loginUser = {
-        email: 'test@example.com',
-        password: 'password123',
+        email: TEST_USER.email,
+        password: TEST_USER.password,
       };
 
       await page.goto('/login');
@@ -173,7 +172,7 @@ test.describe('Authentication E2E Tests', () => {
     test('should submit forgot password form', async ({ page }) => {
       await page.goto('/forgot-password');
 
-      await page.getByLabel('Email').fill('test@example.com');
+      await page.getByLabel('Email').fill(TEST_USER.email);
       await page.getByRole('button', { name: /send reset link/i }).click();
 
       // Should show success message
@@ -249,8 +248,8 @@ test.describe('Authentication E2E Tests', () => {
     test('should successfully logout', async ({ page }) => {
       // Login first with verified user
       await page.goto('/login');
-      await page.getByLabel('Email').fill('test@example.com');
-      await page.getByLabel('Password').fill('password123');
+      await page.getByLabel('Email').fill(TEST_USER.email);
+      await page.getByLabel('Password').fill(TEST_USER.password);
       await page.getByRole('button', { name: /^login$/i }).click();
 
       // Wait for dashboard
