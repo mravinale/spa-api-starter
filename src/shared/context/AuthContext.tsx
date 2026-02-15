@@ -84,8 +84,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const logout = async () => {
         await signOut();
-        // Clear bearer token on logout
+        // Clear bearer tokens on logout
         localStorage.removeItem("bearer_token");
+        localStorage.removeItem("original_bearer_token");
     };
 
     const forgotPassword = async (email: string) => {

@@ -56,6 +56,7 @@ import {
 } from "../hooks/useUsers"
 import { Checkbox } from "@/shared/components/ui/checkbox"
 import { useAuth } from "@/shared/context/AuthContext"
+import { useOrgRole } from "@/shared/hooks/useOrgRole"
 import type { AdminUser, UserFilterParams } from "../types"
 import { adminService } from "../services/adminService"
 
@@ -111,6 +112,7 @@ export function UsersPage() {
 
   // Auth context
   const { user: currentUser, refreshSession } = useAuth()
+  const { activeOrganizationId } = useOrgRole()
 
   // Queries and mutations
   const { data, isLoading } = useUsers(queryParams)
@@ -272,7 +274,11 @@ export function UsersPage() {
       return
     }
     try {
-      await impersonateUser.mutateAsync(user.id)
+      await impersonateUser.mutateAsync({
+        userId: user.id,
+        role: currentUser?.role || "member",
+        organizationId: activeOrganizationId || undefined,
+      })
       await refreshSession()
       toast.success(`Now impersonating ${user.name}`)
       window.location.href = "/" // Redirect to dashboard
