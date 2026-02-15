@@ -43,9 +43,20 @@ async function globalSetup() {
 
       if (!response.ok) {
         const error = await response.json().catch(() => ({}));
-        throw new Error(
-          `Failed to create test user via ${API_BASE_URL}/api/auth/sign-up/email: ${JSON.stringify(error)}`,
+        // Some providers may fail after user creation (e.g. email quota) or race on duplicate keys.
+        // Re-check DB presence and proceed if the user now exists.
+        const postCreateCheck = await pool.query(
+          `SELECT id FROM "user" WHERE email = $1`,
+          [TEST_USER_EMAIL],
         );
+
+        if (postCreateCheck.rowCount === 0) {
+          throw new Error(
+            `Failed to create test user via ${API_BASE_URL}/api/auth/sign-up/email: ${JSON.stringify(error)}`,
+          );
+        }
+
+        console.warn('⚠️ Sign-up API returned non-OK, but test user exists in DB. Continuing setup.');
       } else {
         console.log('✅ Test user created successfully');
       }

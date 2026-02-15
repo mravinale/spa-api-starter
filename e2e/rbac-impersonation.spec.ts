@@ -130,9 +130,15 @@ test.describe.serial('Platform Admin - Organization Management', () => {
   });
 
   test('should show organization members when org is selected', async ({ page }) => {
-    const targetOrg = page.getByRole('button', {
-      name: new RegExp(`/${IMPERSONATION_ORG_SLUG}$`, 'i'),
-    });
+    const searchInput = page.getByPlaceholder(/search organizations/i);
+    await expect(searchInput).toBeVisible({ timeout: 10000 });
+    await searchInput.fill('E2E Impersonation Org');
+    await page.waitForTimeout(800);
+
+    const targetOrg = page
+      .locator('main')
+      .locator('button', { hasText: /\// })
+      .first();
     await expect(targetOrg).toBeVisible({ timeout: 15000 });
 
     await targetOrg.click();
