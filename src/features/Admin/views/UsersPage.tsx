@@ -1,4 +1,5 @@
-import { useState, useMemo, useEffect } from "react"
+import { useState, useMemo } from "react"
+import { useQueries } from "@tanstack/react-query"
 import { type ColumnDef } from "@tanstack/react-table"
 import {
   IconDotsVertical,
@@ -53,6 +54,7 @@ import {
   useRemoveUser,
   useRemoveUsers,
   useImpersonateUser,
+  userKeys,
 } from "../hooks/useUsers"
 import { Checkbox } from "@/shared/components/ui/checkbox"
 import { useAuth } from "@/shared/context/AuthContext"
@@ -111,7 +113,6 @@ export function UsersPage() {
   const [banReason, setBanReason] = useState("")
   const [newRole, setNewRole] = useState("user")
   const [newPassword, setNewPassword] = useState("")
-  const [capabilitiesByUserId, setCapabilitiesByUserId] = useState<Record<string, UserCapabilities["actions"]>>({})
 
   const [createMeta, setCreateMeta] = useState<null | {
     roles: Array<{ name: string; displayName: string }>
@@ -142,6 +143,30 @@ export function UsersPage() {
 
   // Queries and mutations
   const { data, isLoading } = useUsers(queryParams)
+  const users = data?.data ?? []
+
+  const capabilityQueries = useQueries({
+    queries: users.map((user) => ({
+      queryKey: userKeys.capabilities(user.id),
+      queryFn: () => adminService.getUserCapabilities(user.id),
+      enabled: !!currentUser,
+      staleTime: 60_000,
+    })),
+  })
+
+  const capabilitiesByUserId = useMemo<Record<string, UserCapabilities["actions"]>>(() => {
+    const entries: Array<[string, UserCapabilities["actions"]]> = users.map((user, index) => {
+      const queryResult = capabilityQueries[index]
+      const isSelf = user.id === currentUser?.id
+      const targetRole = user.role || "member"
+      const fallbackActions = getFallbackUserActions(currentUser?.role || "member", targetRole, isSelf)
+
+      return [user.id, queryResult?.data?.actions ?? fallbackActions]
+    })
+
+    return Object.fromEntries(entries)
+  }, [users, capabilityQueries, currentUser?.id, currentUser?.role])
+
   const createUser = useCreateUser()
   const updateUser = useUpdateUser()
   const banUser = useBanUser()
@@ -151,43 +176,6 @@ export function UsersPage() {
   const removeUser = useRemoveUser()
   const removeUsers = useRemoveUsers()
   const impersonateUser = useImpersonateUser()
-
-  useEffect(() => {
-    let mounted = true
-    const users = data?.data ?? []
-
-    if (users.length === 0) {
-      setCapabilitiesByUserId({})
-      return () => {
-        mounted = false
-      }
-    }
-
-    const loadCapabilities = async () => {
-      const entries = await Promise.all(
-        users.map(async (user) => {
-          try {
-            const capabilities = await adminService.getUserCapabilities(user.id)
-            return [user.id, capabilities.actions] as const
-          } catch {
-            const isSelf = user.id === currentUser?.id
-            const targetRole = user.role || "member"
-            return [user.id, getFallbackUserActions(currentUser?.role || "member", targetRole, isSelf)] as const
-          }
-        }),
-      )
-
-      if (mounted) {
-        setCapabilitiesByUserId(Object.fromEntries(entries))
-      }
-    }
-
-    void loadCapabilities()
-
-    return () => {
-      mounted = false
-    }
-  }, [data?.data, currentUser?.id, currentUser?.role])
 
   // Handlers
   const handleCreateUser = async () => {
@@ -569,7 +557,7 @@ export function UsersPage() {
 
       <ServerDataTable
         columns={columns}
-        data={data?.data ?? []}
+        data={users}
         total={data?.total ?? 0}
         pageSize={pageSize}
         pageIndex={pageIndex}
