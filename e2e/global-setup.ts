@@ -4,6 +4,59 @@ import { DATABASE_URL, API_BASE_URL, TEST_USER } from './env';
 const TEST_USER_EMAIL = TEST_USER.email;
 const TEST_USER_PASSWORD = TEST_USER.password;
 
+async function ensureDefaultRolePermissions(pool: Pool): Promise<void> {
+  await pool.query(
+    `INSERT INTO role_permissions (role_id, permission_id)
+     SELECT r.id, p.id
+     FROM roles r
+     CROSS JOIN permissions p
+     WHERE r.name = 'admin'
+     ON CONFLICT DO NOTHING`,
+  );
+
+  const managerPermissions = [
+    ['user', 'read'],
+    ['user', 'update'],
+    ['user', 'ban'],
+    ['session', 'read'],
+    ['session', 'revoke'],
+    ['organization', 'read'],
+    ['organization', 'update'],
+    ['organization', 'invite'],
+    ['role', 'read'],
+  ] as const;
+
+  for (const [resource, action] of managerPermissions) {
+    await pool.query(
+      `INSERT INTO role_permissions (role_id, permission_id)
+       SELECT r.id, p.id
+       FROM roles r
+       JOIN permissions p ON p.resource = $2 AND p.action = $3
+       WHERE r.name = $1
+       ON CONFLICT DO NOTHING`,
+      ['manager', resource, action],
+    );
+  }
+
+  const memberPermissions = [
+    ['user', 'read'],
+    ['organization', 'read'],
+    ['role', 'read'],
+  ] as const;
+
+  for (const [resource, action] of memberPermissions) {
+    await pool.query(
+      `INSERT INTO role_permissions (role_id, permission_id)
+       SELECT r.id, p.id
+       FROM roles r
+       JOIN permissions p ON p.resource = $2 AND p.action = $3
+       WHERE r.name = $1
+       ON CONFLICT DO NOTHING`,
+      ['member', resource, action],
+    );
+  }
+}
+
 /**
  * Global setup for Playwright tests.
  * Creates test user if not exists, sets as admin, and clears sessions.
@@ -81,6 +134,9 @@ async function globalSetup() {
       );
       console.log(`✅ Cleared ${sessionsResult.rowCount} existing sessions`);
     }
+
+    await ensureDefaultRolePermissions(pool);
+    console.log('✅ Ensured default role_permissions for admin/manager/member');
   } catch (error) {
     console.error('❌ Failed to set up test user:', error);
     throw error;

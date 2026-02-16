@@ -22,6 +22,22 @@ export type OrgRolesMetadata = {
     assignableRoles: string[];
 };
 
+export type UserCapabilities = {
+    targetUserId: string;
+    targetRole: "admin" | "manager" | "member";
+    isSelf: boolean;
+    actions: {
+        update: boolean;
+        setRole: boolean;
+        ban: boolean;
+        unban: boolean;
+        setPassword: boolean;
+        remove: boolean;
+        revokeSessions: boolean;
+        impersonate: boolean;
+    };
+};
+
 /**
  * Get organization roles metadata (Better Auth organization roles).
  * Exported separately to fix TypeScript type inference for large object literals.
@@ -55,6 +71,15 @@ export const adminService = {
         if (!response.ok) {
             const error = await response.json().catch(() => ({}));
             throw new Error(error.message || "Failed to list users");
+        }
+        return await response.json();
+    },
+
+    async getUserCapabilities(userId: string): Promise<UserCapabilities> {
+        const response = await fetchWithAuth(`${API_BASE_URL}/api/admin/users/${userId}/capabilities`);
+        if (!response.ok) {
+            const error = await response.json().catch(() => ({}));
+            throw new Error(error.message || "Failed to fetch user capabilities");
         }
         return await response.json();
     },
@@ -488,29 +513,31 @@ export const organizationService = {
      * Invite a member to an organization.
      */
     async inviteMember(params: { organizationId: string; email: string; role: string }) {
-        const { data, error } = await organization.inviteMember({
-            organizationId: params.organizationId,
-            email: params.email,
-            role: params.role as "admin" | "member" | "owner",
+        const response = await fetchWithAuth(`${API_BASE_URL}/api/platform-admin/organizations/${params.organizationId}/invitations`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email: params.email, role: params.role }),
         });
-
-        if (error) {
+        if (!response.ok) {
+            const error = await response.json().catch(() => ({}));
             throw new Error(error.message || "Failed to invite member");
         }
-
-        return data;
+        const result = await response.json();
+        return result.data;
     },
 
     /**
      * Remove a member from an organization.
      */
-    async removeMember(params: { organizationId: string; memberIdOrEmail: string }) {
-        const { error } = await organization.removeMember({
-            organizationId: params.organizationId,
-            memberIdOrEmail: params.memberIdOrEmail,
-        });
-
-        if (error) {
+    async removeMember(params: { organizationId: string; memberId: string }) {
+        const response = await fetchWithAuth(
+            `${API_BASE_URL}/api/platform-admin/organizations/${params.organizationId}/members/${params.memberId}`,
+            {
+                method: "DELETE",
+            },
+        );
+        if (!response.ok) {
+            const error = await response.json().catch(() => ({}));
             throw new Error(error.message || "Failed to remove member");
         }
     },
@@ -518,14 +545,17 @@ export const organizationService = {
     /**
      * Update a member's role.
      */
-    async updateMemberRole(params: { organizationId: string; memberId: string; role: string | string[] }) {
-        const { error } = await organization.updateMemberRole({
-            organizationId: params.organizationId,
-            memberId: params.memberId,
-            role: params.role as "admin" | "member" | "owner" | ("admin" | "member" | "owner")[],
-        });
-
-        if (error) {
+    async updateMemberRole(params: { organizationId: string; memberId: string; role: "admin" | "manager" | "member" }) {
+        const response = await fetchWithAuth(
+            `${API_BASE_URL}/api/platform-admin/organizations/${params.organizationId}/members/${params.memberId}/role`,
+            {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ role: params.role }),
+            },
+        );
+        if (!response.ok) {
+            const error = await response.json().catch(() => ({}));
             throw new Error(error.message || "Failed to update member role");
         }
     },
@@ -546,10 +576,12 @@ export const organizationService = {
     /**
      * Cancel an invitation.
      */
-    async cancelInvitation(invitationId: string) {
-        const { error } = await organization.cancelInvitation({ invitationId });
-
-        if (error) {
+    async cancelInvitation(params: { organizationId: string; invitationId: string }) {
+        const response = await fetchWithAuth(`${API_BASE_URL}/api/platform-admin/organizations/${params.organizationId}/invitations/${params.invitationId}`, {
+            method: "DELETE",
+        });
+        if (!response.ok) {
+            const error = await response.json().catch(() => ({}));
             throw new Error(error.message || "Failed to cancel invitation");
         }
     },

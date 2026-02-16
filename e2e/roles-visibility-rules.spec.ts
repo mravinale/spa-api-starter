@@ -32,6 +32,8 @@ async function loginAsManager(page: Page) {
     userEmail: managerEmail,
     organizationId: managerOrganizationId,
   });
+  await page.goto('/');
+  await page.waitForLoadState('networkidle');
 }
 
 test.describe('Roles page visibility rules', () => {

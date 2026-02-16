@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { adminService } from "../services/adminService";
+import { adminService, type UserCapabilities } from "../services/adminService";
 import type {
     UserFilterParams,
     CreateUserParams,
@@ -17,6 +17,7 @@ export const userKeys = {
     details: () => [...userKeys.all, "detail"] as const,
     detail: (id: string) => [...userKeys.details(), id] as const,
     sessions: (userId: string) => [...userKeys.all, "sessions", userId] as const,
+    capabilities: (userId: string) => [...userKeys.all, "capabilities", userId] as const,
 };
 
 /**
@@ -26,6 +27,17 @@ export function useUsers(params: UserFilterParams = {}) {
     return useQuery({
         queryKey: userKeys.list(params),
         queryFn: () => adminService.listUsers(params),
+    });
+}
+
+/**
+ * Hook to fetch backend-computed capabilities for a target user.
+ */
+export function useUserCapabilities(userId: string) {
+    return useQuery<UserCapabilities>({
+        queryKey: userKeys.capabilities(userId),
+        queryFn: () => adminService.getUserCapabilities(userId),
+        enabled: !!userId,
     });
 }
 

@@ -35,7 +35,9 @@ async function ensureAdminRole() {
     await pool.query(
       `INSERT INTO organization (id, name, slug, "createdAt", metadata)
        VALUES (gen_random_uuid()::text, $1, $2, NOW(), NULL)
-       ON CONFLICT (slug) DO NOTHING`,
+       ON CONFLICT (slug) DO UPDATE
+         SET name = EXCLUDED.name,
+             "createdAt" = NOW()`,
       ['E2E Impersonation Org', IMPERSONATION_ORG_SLUG],
     );
 
@@ -86,6 +88,21 @@ async function ensureAdminRole() {
   }
 }
 
+async function findOrganizationCardBySlug(page: import('@playwright/test').Page, slug: string) {
+  const searchInput = page.getByPlaceholder(/search organizations/i);
+  await expect(searchInput).toBeVisible({ timeout: 10000 });
+  await searchInput.fill(slug);
+  await page.waitForTimeout(800);
+
+  const targetOrg = page
+    .locator('button')
+    .filter({ hasText: new RegExp(`/${slug}\\b`, 'i') })
+    .first();
+
+  await expect(targetOrg).toBeVisible({ timeout: 15000 });
+  return targetOrg;
+}
+
 // Helper to login
 async function login(page: import('@playwright/test').Page, email = TEST_USER.email, password = TEST_USER.password) {
   await page.goto('/login');
@@ -130,16 +147,7 @@ test.describe.serial('Platform Admin - Organization Management', () => {
   });
 
   test('should show organization members when org is selected', async ({ page }) => {
-    const searchInput = page.getByPlaceholder(/search organizations/i);
-    await expect(searchInput).toBeVisible({ timeout: 10000 });
-    await searchInput.fill('E2E Impersonation Org');
-    await page.waitForTimeout(800);
-
-    const targetOrg = page
-      .locator('main')
-      .locator('button', { hasText: /\// })
-      .first();
-    await expect(targetOrg).toBeVisible({ timeout: 15000 });
+    const targetOrg = await findOrganizationCardBySlug(page, IMPERSONATION_ORG_SLUG);
 
     await targetOrg.click();
     await page.waitForLoadState('networkidle');
