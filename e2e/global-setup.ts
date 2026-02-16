@@ -4,6 +4,59 @@ import { DATABASE_URL, API_BASE_URL, TEST_USER } from './env';
 const TEST_USER_EMAIL = TEST_USER.email;
 const TEST_USER_PASSWORD = TEST_USER.password;
 
+async function ensureDefaultRolePermissions(pool: Pool): Promise<void> {
+  await pool.query(
+    `INSERT INTO role_permissions (role_id, permission_id)
+     SELECT r.id, p.id
+     FROM roles r
+     CROSS JOIN permissions p
+     WHERE r.name = 'admin'
+     ON CONFLICT DO NOTHING`,
+  );
+
+  const managerPermissions = [
+    ['user', 'read'],
+    ['user', 'update'],
+    ['user', 'ban'],
+    ['session', 'read'],
+    ['session', 'revoke'],
+    ['organization', 'read'],
+    ['organization', 'update'],
+    ['organization', 'invite'],
+    ['role', 'read'],
+  ] as const;
+
+  for (const [resource, action] of managerPermissions) {
+    await pool.query(
+      `INSERT INTO role_permissions (role_id, permission_id)
+       SELECT r.id, p.id
+       FROM roles r
+       JOIN permissions p ON p.resource = $2 AND p.action = $3
+       WHERE r.name = $1
+       ON CONFLICT DO NOTHING`,
+      ['manager', resource, action],
+    );
+  }
+
+  const memberPermissions = [
+    ['user', 'read'],
+    ['organization', 'read'],
+    ['role', 'read'],
+  ] as const;
+
+  for (const [resource, action] of memberPermissions) {
+    await pool.query(
+      `INSERT INTO role_permissions (role_id, permission_id)
+       SELECT r.id, p.id
+       FROM roles r
+       JOIN permissions p ON p.resource = $2 AND p.action = $3
+       WHERE r.name = $1
+       ON CONFLICT DO NOTHING`,
+      ['member', resource, action],
+    );
+  }
+}
+
 /**
  * Global setup for Playwright tests.
  * Creates test user if not exists, sets as admin, and clears sessions.
@@ -43,9 +96,20 @@ async function globalSetup() {
 
       if (!response.ok) {
         const error = await response.json().catch(() => ({}));
-        throw new Error(
-          `Failed to create test user via ${API_BASE_URL}/api/auth/sign-up/email: ${JSON.stringify(error)}`,
+        // Some providers may fail after user creation (e.g. email quota) or race on duplicate keys.
+        // Re-check DB presence and proceed if the user now exists.
+        const postCreateCheck = await pool.query(
+          `SELECT id FROM "user" WHERE email = $1`,
+          [TEST_USER_EMAIL],
         );
+
+        if (postCreateCheck.rowCount === 0) {
+          throw new Error(
+            `Failed to create test user via ${API_BASE_URL}/api/auth/sign-up/email: ${JSON.stringify(error)}`,
+          );
+        }
+
+        console.warn('⚠️ Sign-up API returned non-OK, but test user exists in DB. Continuing setup.');
       } else {
         console.log('✅ Test user created successfully');
       }
@@ -70,6 +134,9 @@ async function globalSetup() {
       );
       console.log(`✅ Cleared ${sessionsResult.rowCount} existing sessions`);
     }
+
+    await ensureDefaultRolePermissions(pool);
+    console.log('✅ Ensured default role_permissions for admin/manager/member');
   } catch (error) {
     console.error('❌ Failed to set up test user:', error);
     throw error;

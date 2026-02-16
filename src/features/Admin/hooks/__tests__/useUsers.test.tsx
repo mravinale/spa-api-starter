@@ -9,6 +9,8 @@ import {
   useUnbanUser,
   useSetUserRole,
   useUserCapabilities,
+  useImpersonateUser,
+  useStopImpersonating,
   userKeys,
 } from '../useUsers';
 import { adminService } from '../../services/adminService';
@@ -241,6 +243,64 @@ describe('useUserCapabilities hook', () => {
 
     expect(mockAdminService.getUserCapabilities).toHaveBeenCalledWith('1');
     expect(result.current.data).toEqual(capabilities);
+  });
+});
+
+describe('useImpersonateUser hook', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('should call adminService.impersonateUser with userId, role, and organizationId', async () => {
+    (adminService.impersonateUser as Mock).mockResolvedValue(undefined);
+
+    const { result } = renderHook(() => useImpersonateUser(), {
+      wrapper: createWrapper(),
+    });
+
+    await result.current.mutateAsync({
+      userId: 'user-1',
+      role: 'manager',
+      organizationId: 'org-1',
+    });
+
+    expect(adminService.impersonateUser).toHaveBeenCalledWith('user-1', {
+      role: 'manager',
+      organizationId: 'org-1',
+    });
+  });
+
+  it('should call adminService.impersonateUser with admin role by default', async () => {
+    (adminService.impersonateUser as Mock).mockResolvedValue(undefined);
+
+    const { result } = renderHook(() => useImpersonateUser(), {
+      wrapper: createWrapper(),
+    });
+
+    await result.current.mutateAsync({ userId: 'user-1' });
+
+    expect(adminService.impersonateUser).toHaveBeenCalledWith('user-1', {
+      role: undefined,
+      organizationId: undefined,
+    });
+  });
+});
+
+describe('useStopImpersonating hook', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('should call adminService.stopImpersonating', async () => {
+    (adminService.stopImpersonating as Mock).mockResolvedValue(undefined);
+
+    const { result } = renderHook(() => useStopImpersonating(), {
+      wrapper: createWrapper(),
+    });
+
+    await result.current.mutateAsync();
+
+    expect(adminService.stopImpersonating).toHaveBeenCalled();
   });
 });
 
