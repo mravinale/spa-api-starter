@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 
 import { TEST_USER } from './env';
-import { loginWithCredentials } from './test-helpers';
+import { escapeRegExp, loginWithCredentials } from './test-helpers';
 
 test.describe('Navigation integrity', () => {
   test.beforeEach(async ({ page }) => {
@@ -11,7 +11,7 @@ test.describe('Navigation integrity', () => {
   test('settings menu entry should not break navigation', async ({ page }) => {
     const userMenuButton = page
       .locator('[data-slot="sidebar"]')
-      .getByRole('button', { name: new RegExp(TEST_USER.email, 'i') });
+      .getByRole('button', { name: new RegExp(escapeRegExp(TEST_USER.email), 'i') });
     await expect(userMenuButton).toBeVisible();
     await userMenuButton.click();
 

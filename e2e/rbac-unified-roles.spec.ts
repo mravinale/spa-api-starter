@@ -1,6 +1,7 @@
 import { test, expect, Page } from '@playwright/test';
 import { Pool } from 'pg';
 import { DATABASE_URL, API_BASE_URL, TEST_USER } from './env';
+import { resendTestEmail } from '../src/shared/utils/resendTestEmail';
 
 /**
  * Comprehensive E2E Tests for Unified Role Model
@@ -10,7 +11,7 @@ import { DATABASE_URL, API_BASE_URL, TEST_USER } from './env';
  * - Manager: Organization manager with org-scoped access
  * - Member: Organization member with basic read access
  * 
- * Uses a single test user (test@example.com) and changes their role between test suites.
+ * Uses a single test user (delivered+e2e-test-user@resend.dev) and changes their role between test suites.
  */
 
 // TEST_USER imported from ./env
@@ -76,7 +77,7 @@ async function setActiveOrganizationForUserSessions(organizationId: string) {
 // Seed a member user for admin to act on
 async function ensureMemberUser(emailPrefix: string) {
   return await withDatabase(async (pool) => {
-    const email = `${emailPrefix}@example.com`;
+    const email = resendTestEmail('delivered', emailPrefix);
     let userRow = await pool.query(`SELECT id FROM "user" WHERE email = $1`, [email]);
     let userId: string;
     if (userRow.rowCount === 0) {
@@ -706,7 +707,7 @@ test.describe('Organization Scoping - Manager Restrictions', () => {
         `INSERT INTO "user" (id, name, email, role, "emailVerified", "createdAt", "updatedAt")
          VALUES (gen_random_uuid()::text, $1, $2, $3, false, NOW(), NOW())
          RETURNING id`,
-        ['User In Manager Org', `user-in-mgr-org-${Date.now()}@example.com`, 'member']
+        ['User In Manager Org', resendTestEmail('delivered', `user-in-mgr-org-${Date.now()}`), 'member']
       );
       userInManagerOrg = user1Result.rows[0].id;
       
@@ -720,7 +721,7 @@ test.describe('Organization Scoping - Manager Restrictions', () => {
         `INSERT INTO "user" (id, name, email, role, "emailVerified", "createdAt", "updatedAt")
          VALUES (gen_random_uuid()::text, $1, $2, $3, false, NOW(), NOW())
          RETURNING id`,
-        ['User In Other Org', `user-in-other-org-${Date.now()}@example.com`, 'member']
+        ['User In Other Org', resendTestEmail('delivered', `user-in-other-org-${Date.now()}`), 'member']
       );
       userInOtherOrg = user2Result.rows[0].id;
       

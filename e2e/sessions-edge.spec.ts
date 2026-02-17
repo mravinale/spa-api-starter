@@ -1,7 +1,13 @@
 import { test, expect, type Page } from '@playwright/test';
 
 import { TEST_USER } from './env';
-import { ensureUserWithRole, loginWithCredentials, uniqueEmail, withDatabase } from './test-helpers';
+import {
+  ensureUserWithRole,
+  escapeRegExp,
+  loginWithCredentials,
+  uniqueEmail,
+  withDatabase,
+} from './test-helpers';
 
 const noSessionUserEmail = uniqueEmail('e2e-session-empty');
 const noSessionUserPassword = 'SessionPassword123!';
@@ -19,7 +25,7 @@ async function selectUser(page: Page, params: { searchTerm: string; expectedText
   await page.getByPlaceholder(/search users/i).fill(params.searchTerm);
   const userButton = page
     .locator('main')
-    .getByRole('button', { name: new RegExp(params.expectedText, 'i') })
+    .getByRole('button', { name: new RegExp(escapeRegExp(params.expectedText), 'i') })
     .first();
   await expect(userButton).toBeVisible({ timeout: 15000 });
   await userButton.click();

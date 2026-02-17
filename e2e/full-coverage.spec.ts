@@ -1,6 +1,7 @@
 import { test, expect, Page } from '@playwright/test';
 import { Pool } from 'pg';
 import { DATABASE_URL, API_BASE_URL, TEST_USER } from './env';
+import { uniqueEmail } from './test-helpers';
 
 /**
  * Full Coverage E2E Tests
@@ -67,7 +68,7 @@ test.describe.serial('User Management - Full CRUD', () => {
   test('should create a new user with valid data', async ({ page }) => {
     const newUser = {
       name: `Test User ${uniqueId()}`,
-      email: `testuser-${uniqueId()}@example.com`,
+      email: uniqueEmail('full-coverage-user'),
       password: 'TestPassword123!',
     };
 
@@ -302,7 +303,7 @@ test.describe.serial('Organization Management - Full CRUD', () => {
         // Fill invitation form
         const emailInput = page.getByLabel(/email/i);
         if (await emailInput.isVisible({ timeout: 2000 }).catch(() => false)) {
-          await emailInput.fill(`invite-${uniqueId()}@example.com`);
+          await emailInput.fill(uniqueEmail('full-coverage-invite'));
           
           // Select role
           const roleSelect = page.getByRole('combobox');

@@ -57,7 +57,7 @@ Open **http://localhost:5173**
 
 ### 3. Login
 
-Use the test admin account: `test@example.com` / `password123`
+Use the test admin account: `delivered+e2e-test-user@resend.dev` / `password123`
 
 ---
 

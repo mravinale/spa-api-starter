@@ -2,6 +2,7 @@ import { expect, type Page } from '@playwright/test';
 import { Pool } from 'pg';
 
 import { API_BASE_URL, DATABASE_URL } from './env';
+import { uniqueResendDeliveredEmail } from '../src/shared/utils/resendTestEmail';
 
 export type AppRole = 'admin' | 'manager' | 'member';
 
@@ -15,7 +16,11 @@ export async function withDatabase<T>(fn: (pool: Pool) => Promise<T>): Promise<T
 }
 
 export function uniqueEmail(prefix: string): string {
-  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}@example.com`;
+  return uniqueResendDeliveredEmail(prefix);
+}
+
+export function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 export async function ensureUserWithRole(params: {
