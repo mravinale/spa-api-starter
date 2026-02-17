@@ -126,6 +126,7 @@ export async function loginWithCredentials(page: Page, email: string, password: 
   await page.getByLabel('Password').fill(password);
   await page.getByRole('button', { name: /^login$/i }).click();
   await expect(page).toHaveURL('/', { timeout: 15000 });
+  await page.waitForLoadState('networkidle');
 }
 
 export async function ensureOrganizationMembership(params: {

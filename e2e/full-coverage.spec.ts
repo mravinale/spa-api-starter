@@ -42,6 +42,7 @@ async function login(page: Page) {
   await page.getByLabel('Password').fill(TEST_USER.password);
   await page.getByRole('button', { name: /^login$/i }).click();
   await expect(page).toHaveURL('/', { timeout: 15000 });
+  await page.waitForLoadState('networkidle');
 }
 
 // Generate unique identifiers for test data

@@ -25,8 +25,7 @@ async function loginAsManager(page: Page) {
     userEmail: managerEmail,
     organizationId: managerOrganizationId,
   });
-  await page.goto('/');
-  await page.waitForLoadState('networkidle');
+  await page.reload({ waitUntil: 'networkidle' });
 }
 
 test.describe('Route guard behavior', () => {
