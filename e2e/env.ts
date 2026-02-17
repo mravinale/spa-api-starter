@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from 'fs';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
+import { DEFAULT_E2E_TEST_USER_EMAIL } from '../src/shared/utils/resendTestEmail';
 
 /**
  * Shared E2E environment configuration.
@@ -48,6 +49,6 @@ export const FE_URL = process.env.E2E_FE_URL || process.env.FE_URL || envVars.FE
 
 /** Pre-seeded test user credentials */
 export const TEST_USER = {
-  email: process.env.E2E_TEST_USER_EMAIL || process.env.TEST_USER_EMAIL || 'test@example.com',
+  email: process.env.E2E_TEST_USER_EMAIL || process.env.TEST_USER_EMAIL || DEFAULT_E2E_TEST_USER_EMAIL,
   password: process.env.E2E_TEST_USER_PASSWORD || process.env.TEST_USER_PASSWORD || 'password123',
 };

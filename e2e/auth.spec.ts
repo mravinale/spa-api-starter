@@ -1,5 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { API_BASE_URL, TEST_USER } from './env';
+import { uniqueEmail } from './test-helpers';
+import { resendTestEmail } from '../src/shared/utils/resendTestEmail';
 
 // Helper to create a verified user directly via API
 async function createVerifiedUser(email: string, password: string, name: string) {
@@ -44,7 +46,7 @@ test.describe('Authentication E2E Tests', () => {
     test('should successfully sign up a new user and follow configured post-signup redirect', async ({ page }) => {
       const testUser = {
         name: 'Test User',
-        email: `test-${Date.now()}@example.com`,
+        email: uniqueEmail('auth-signup'),
         password: 'TestPassword123!',
       };
 
@@ -112,7 +114,7 @@ test.describe('Authentication E2E Tests', () => {
     test('should show error for invalid credentials', async ({ page }) => {
       await page.goto('/login');
 
-      await page.getByLabel('Email').fill('nonexistent@example.com');
+      await page.getByLabel('Email').fill(resendTestEmail('delivered', 'nonexistent-login-user'));
       await page.getByLabel('Password').fill('wrongpassword');
       await page.getByRole('button', { name: /^login$/i }).click();
 
@@ -126,7 +128,7 @@ test.describe('Authentication E2E Tests', () => {
       // Create a new user that won't be verified
       const unverifiedUser = {
         name: 'Unverified User',
-        email: `unverified-${Date.now()}@example.com`,
+        email: uniqueEmail('auth-unverified'),
         password: 'TestPassword123!',
       };
 

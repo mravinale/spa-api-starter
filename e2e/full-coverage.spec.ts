@@ -1,6 +1,7 @@
 import { test, expect, Page } from '@playwright/test';
 import { Pool } from 'pg';
 import { DATABASE_URL, API_BASE_URL, TEST_USER } from './env';
+import { uniqueEmail } from './test-helpers';
 
 /**
  * Full Coverage E2E Tests
@@ -41,6 +42,7 @@ async function login(page: Page) {
   await page.getByLabel('Password').fill(TEST_USER.password);
   await page.getByRole('button', { name: /^login$/i }).click();
   await expect(page).toHaveURL('/', { timeout: 15000 });
+  await page.waitForLoadState('networkidle');
 }
 
 // Generate unique identifiers for test data
@@ -67,7 +69,7 @@ test.describe.serial('User Management - Full CRUD', () => {
   test('should create a new user with valid data', async ({ page }) => {
     const newUser = {
       name: `Test User ${uniqueId()}`,
-      email: `testuser-${uniqueId()}@example.com`,
+      email: uniqueEmail('full-coverage-user'),
       password: 'TestPassword123!',
     };
 
@@ -302,7 +304,7 @@ test.describe.serial('Organization Management - Full CRUD', () => {
         // Fill invitation form
         const emailInput = page.getByLabel(/email/i);
         if (await emailInput.isVisible({ timeout: 2000 }).catch(() => false)) {
-          await emailInput.fill(`invite-${uniqueId()}@example.com`);
+          await emailInput.fill(uniqueEmail('full-coverage-invite'));
           
           // Select role
           const roleSelect = page.getByRole('combobox');

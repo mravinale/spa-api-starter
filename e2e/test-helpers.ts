@@ -2,6 +2,7 @@ import { expect, type Page } from '@playwright/test';
 import { Pool } from 'pg';
 
 import { API_BASE_URL, DATABASE_URL } from './env';
+import { uniqueResendDeliveredEmail } from '../src/shared/utils/resendTestEmail';
 
 export type AppRole = 'admin' | 'manager' | 'member';
 
@@ -15,7 +16,11 @@ export async function withDatabase<T>(fn: (pool: Pool) => Promise<T>): Promise<T
 }
 
 export function uniqueEmail(prefix: string): string {
-  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}@example.com`;
+  return uniqueResendDeliveredEmail(prefix);
+}
+
+export function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 export async function ensureUserWithRole(params: {
@@ -121,6 +126,7 @@ export async function loginWithCredentials(page: Page, email: string, password: 
   await page.getByLabel('Password').fill(password);
   await page.getByRole('button', { name: /^login$/i }).click();
   await expect(page).toHaveURL('/', { timeout: 15000 });
+  await page.waitForLoadState('networkidle');
 }
 
 export async function ensureOrganizationMembership(params: {

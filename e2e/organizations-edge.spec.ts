@@ -2,10 +2,11 @@ import { test, expect, type Page } from '@playwright/test';
 
 import { TEST_USER } from './env';
 import { loginWithCredentials, withDatabase } from './test-helpers';
+import { resendTestEmail } from '../src/shared/utils/resendTestEmail';
 
 const EXISTING_ORG_SLUG = `e2e-org-existing-${Date.now()}`;
 const MANAGE_ORG_SLUG = `e2e-org-manage-${Date.now()}`;
-const MANAGE_MEMBER_EMAIL = `e2e-org-member-${Date.now()}@example.com`;
+const MANAGE_MEMBER_EMAIL = resendTestEmail('delivered', `e2e-org-member-${Date.now()}`);
 
 async function ensureOrganization(slug: string, name: string): Promise<void> {
   await withDatabase(async (pool) => {

@@ -1,9 +1,11 @@
 import { test, expect } from '@playwright/test';
 import { Pool } from 'pg';
 import { DATABASE_URL, API_BASE_URL, TEST_USER } from './env';
+import { escapeRegExp } from './test-helpers';
+import { resendTestEmail } from '../src/shared/utils/resendTestEmail';
 
 const IMPERSONATION_ORG_SLUG = 'e2e-impersonation-org';
-const IMPERSONATION_TARGET_EMAIL = 'e2e-impersonation-member@example.com';
+const IMPERSONATION_TARGET_EMAIL = resendTestEmail('delivered', 'e2e-impersonation-member');
 const IMPERSONATION_TARGET_NAME = 'E2E Impersonation Member';
 
 /**
@@ -252,7 +254,7 @@ test.describe.serial('Impersonation', () => {
     const banner = page.locator('.bg-amber-500');
     await expect(banner).toBeVisible({ timeout: 15000 });
     await expect(banner.getByText(/you are impersonating/i)).toBeVisible();
-    await expect(banner.getByText(new RegExp(IMPERSONATION_TARGET_EMAIL, 'i'))).toBeVisible();
+    await expect(banner.getByText(new RegExp(escapeRegExp(IMPERSONATION_TARGET_EMAIL), 'i'))).toBeVisible();
 
     // Click Stop Impersonating button
     await banner.getByRole('button', { name: /stop impersonating/i }).click();

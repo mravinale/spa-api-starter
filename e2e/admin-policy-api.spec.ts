@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { Pool } from 'pg';
 import { API_BASE_URL, DATABASE_URL, TEST_USER } from './env';
+import { uniqueEmail } from './test-helpers';
 
 async function withDatabase<T>(fn: (pool: Pool) => Promise<T>): Promise<T> {
   const pool = new Pool({ connectionString: DATABASE_URL });
@@ -125,12 +126,12 @@ test.describe('Admin policy API coverage', () => {
     const headers = await signInAndGetHeaders(request);
 
     const targetMemberId = await ensureUser(
-      `e2e-cap-member-${Date.now()}@example.com`,
+      uniqueEmail('e2e-cap-member'),
       'E2E Cap Member',
       'member',
     );
     const targetAdminId = await ensureUser(
-      `e2e-cap-admin-${Date.now()}@example.com`,
+      uniqueEmail('e2e-cap-admin'),
       'E2E Cap Admin',
       'admin',
     );
@@ -155,7 +156,7 @@ test.describe('Admin policy API coverage', () => {
 
     const suffix = Date.now();
     const orgId = await createOrganization(`e2e-policy-org-${suffix}`, `E2E Policy Org ${suffix}`);
-    const loneAdminUserId = await ensureUser(`e2e-last-admin-${suffix}@example.com`, 'E2E Last Admin', 'member');
+    const loneAdminUserId = await ensureUser(uniqueEmail('e2e-last-admin'), 'E2E Last Admin', 'member');
     const loneAdminMemberId = await ensureMember(orgId, loneAdminUserId, 'admin');
 
     const demoteResponse = await request.put(
@@ -179,7 +180,7 @@ test.describe('Admin policy API coverage', () => {
 
     const suffix = Date.now();
     const orgId = await createOrganization(`e2e-invite-org-${suffix}`, `E2E Invite Org ${suffix}`);
-    const inviteEmail = `e2e-invitee-${suffix}@example.com`;
+    const inviteEmail = uniqueEmail('e2e-invitee');
 
     const createInviteResponse = await request.post(
       `${API_BASE_URL}/api/platform-admin/organizations/${orgId}/invitations`,

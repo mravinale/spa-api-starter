@@ -1,10 +1,11 @@
 import { test, expect } from '@playwright/test';
 import { Pool } from 'pg';
 import { DATABASE_URL, TEST_USER } from './env';
+import { resendTestEmail } from '../src/shared/utils/resendTestEmail';
 
 const AUX_ORG_SLUG = 'e2e-admin-org';
-const AUX_MEMBER_EMAIL = 'e2e-admin-member@example.com';
-const AUX_MANAGER_EMAIL = 'e2e-admin-manager@example.com';
+const AUX_MEMBER_EMAIL = resendTestEmail('delivered', 'e2e-admin-member');
+const AUX_MANAGER_EMAIL = resendTestEmail('delivered', 'e2e-admin-manager');
 
 /**
  * Admin Panel E2E Tests
