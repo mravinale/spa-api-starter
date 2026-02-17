@@ -49,6 +49,19 @@ describe('adminService.impersonateUser', () => {
             expect(mockFetchWithAuth).not.toHaveBeenCalled();
         });
 
+        it('should preserve original bearer token for admin stop flow', async () => {
+            localStorageMock.setItem('bearer_token', 'original-admin-token');
+            vi.clearAllMocks();
+            mockAdminImpersonateUser.mockResolvedValue({ error: null });
+
+            await adminService.impersonateUser('user-1', { role: 'admin' });
+
+            expect(localStorageMock.setItem).toHaveBeenCalledWith(
+                'original_bearer_token',
+                'original-admin-token',
+            );
+        });
+
         it('should default to admin role when no options provided', async () => {
             mockAdminImpersonateUser.mockResolvedValue({ error: null });
 
@@ -135,10 +148,29 @@ describe('adminService.stopImpersonating', () => {
         localStorageMock.clear();
     });
 
+    describe('admin stop with preserved original token', () => {
+        it('should call admin.stopImpersonating and restore original token in one attempt', async () => {
+            localStorageMock.setItem('bearer_token', 'impersonated-token');
+            localStorageMock.setItem('original_bearer_token', 'original-token');
+            localStorageMock.setItem('impersonation_mode', 'admin');
+            vi.clearAllMocks();
+            mockAdminStopImpersonating.mockResolvedValue({ error: null });
+
+            await adminService.stopImpersonating();
+
+            expect(mockAdminStopImpersonating).toHaveBeenCalledTimes(1);
+            expect(mockFetchWithAuth).not.toHaveBeenCalled();
+            expect(localStorageMock.setItem).toHaveBeenCalledWith('bearer_token', 'original-token');
+            expect(localStorageMock.removeItem).toHaveBeenCalledWith('original_bearer_token');
+            expect(localStorageMock.removeItem).toHaveBeenCalledWith('impersonation_mode');
+        });
+    });
+
     describe('org-scoped stop (original_bearer_token present)', () => {
         it('should call org-scoped stop endpoint and restore original token', async () => {
             localStorageMock.setItem('bearer_token', 'impersonated-token');
             localStorageMock.setItem('original_bearer_token', 'original-token');
+            localStorageMock.setItem('impersonation_mode', 'org');
             vi.clearAllMocks();
 
             mockFetchWithAuth.mockResolvedValue({
@@ -154,19 +186,39 @@ describe('adminService.stopImpersonating', () => {
             );
             expect(localStorageMock.setItem).toHaveBeenCalledWith('bearer_token', 'original-token');
             expect(localStorageMock.removeItem).toHaveBeenCalledWith('original_bearer_token');
+            expect(localStorageMock.removeItem).toHaveBeenCalledWith('impersonation_mode');
             expect(mockAdminStopImpersonating).not.toHaveBeenCalled();
         });
 
-        it('should throw on org-scoped stop error', async () => {
+        it('should throw on non-recoverable org-scoped stop error', async () => {
+            localStorageMock.setItem('original_bearer_token', 'original-token');
+            localStorageMock.setItem('impersonation_mode', 'org');
+            vi.clearAllMocks();
+
+            mockFetchWithAuth.mockResolvedValue({
+                ok: false,
+                status: 500,
+                json: () => Promise.resolve({ message: 'Internal error', statusCode: 500 }),
+            });
+
+            await expect(adminService.stopImpersonating()).rejects.toThrow('Internal error');
+        });
+
+        it('should fallback to local token restore for legacy sessions without mode metadata', async () => {
+            localStorageMock.setItem('bearer_token', 'impersonated-token');
             localStorageMock.setItem('original_bearer_token', 'original-token');
             vi.clearAllMocks();
 
             mockFetchWithAuth.mockResolvedValue({
                 ok: false,
-                json: () => Promise.resolve({ message: 'Session not found' }),
+                status: 404,
+                json: () => Promise.resolve({ message: 'Session not found', statusCode: 404 }),
             });
 
-            await expect(adminService.stopImpersonating()).rejects.toThrow('Session not found');
+            await expect(adminService.stopImpersonating()).resolves.toBeUndefined();
+            expect(localStorageMock.setItem).toHaveBeenCalledWith('bearer_token', 'original-token');
+            expect(localStorageMock.removeItem).toHaveBeenCalledWith('original_bearer_token');
+            expect(localStorageMock.removeItem).toHaveBeenCalledWith('impersonation_mode');
         });
     });
 

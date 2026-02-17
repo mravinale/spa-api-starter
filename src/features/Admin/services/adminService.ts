@@ -13,6 +13,7 @@ import type {
 } from "../types";
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
+const IMPERSONATION_MODE_STORAGE_KEY = "impersonation_mode";
 
 /**
  * Organization roles metadata type
@@ -277,10 +278,15 @@ export const adminService = {
         const orgId = options?.organizationId;
 
         if (role === "admin") {
+            const originalToken = localStorage.getItem("bearer_token");
             const { error } = await admin.impersonateUser({ userId });
             if (error) {
                 throw new Error(error.message || "Failed to impersonate user");
             }
+            if (originalToken) {
+                localStorage.setItem("original_bearer_token", originalToken);
+            }
+            localStorage.setItem(IMPERSONATION_MODE_STORAGE_KEY, "admin");
         } else {
             if (!orgId) {
                 throw new Error("Active organization required for manager impersonation");
@@ -302,6 +308,9 @@ export const adminService = {
                     localStorage.setItem("original_bearer_token", originalToken);
                 }
                 localStorage.setItem("bearer_token", data.sessionToken);
+                localStorage.setItem(IMPERSONATION_MODE_STORAGE_KEY, "org");
+            } else {
+                throw new Error("Missing impersonation session token");
             }
         }
     },
@@ -313,6 +322,18 @@ export const adminService = {
      */
     async stopImpersonating(): Promise<void> {
         const originalToken = localStorage.getItem("original_bearer_token");
+        const mode = localStorage.getItem(IMPERSONATION_MODE_STORAGE_KEY);
+
+        if (originalToken && mode === "admin") {
+            const { error } = await admin.stopImpersonating();
+            if (error) {
+                throw new Error(error.message || "Failed to stop impersonating");
+            }
+            localStorage.setItem("bearer_token", originalToken);
+            localStorage.removeItem("original_bearer_token");
+            localStorage.removeItem(IMPERSONATION_MODE_STORAGE_KEY);
+            return;
+        }
 
         if (originalToken) {
             // Org-scoped impersonation: delete the impersonated session, restore original token
@@ -321,16 +342,35 @@ export const adminService = {
             });
             if (!response.ok) {
                 const error = await response.json().catch(() => ({}));
+
+                // Recover gracefully when impersonated session is already gone.
+                const statusCode =
+                    typeof (error as { statusCode?: unknown }).statusCode === "number"
+                        ? (error as { statusCode: number }).statusCode
+                        : response.status;
+                const isSessionNotFound =
+                    statusCode === 404 ||
+                    (error as { message?: unknown }).message === "Session not found";
+
+                if (isSessionNotFound) {
+                    localStorage.setItem("bearer_token", originalToken);
+                    localStorage.removeItem("original_bearer_token");
+                    localStorage.removeItem(IMPERSONATION_MODE_STORAGE_KEY);
+                    return;
+                }
+
                 throw new Error(error.message || "Failed to stop impersonating");
             }
             localStorage.setItem("bearer_token", originalToken);
             localStorage.removeItem("original_bearer_token");
+            localStorage.removeItem(IMPERSONATION_MODE_STORAGE_KEY);
         } else {
             // Admin impersonation: use Better Auth's built-in endpoint
             const { error } = await admin.stopImpersonating();
             if (error) {
                 throw new Error(error.message || "Failed to stop impersonating");
             }
+            localStorage.removeItem(IMPERSONATION_MODE_STORAGE_KEY);
         }
     },
 
