@@ -15,6 +15,12 @@ import type {
 const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
 const IMPERSONATION_MODE_STORAGE_KEY = "impersonation_mode";
 
+function restoreOriginalToken(originalToken: string): void {
+    localStorage.setItem("bearer_token", originalToken);
+    localStorage.removeItem("original_bearer_token");
+    localStorage.removeItem(IMPERSONATION_MODE_STORAGE_KEY);
+}
+
 /**
  * Organization roles metadata type
  */
@@ -329,9 +335,7 @@ export const adminService = {
             if (error) {
                 throw new Error(error.message || "Failed to stop impersonating");
             }
-            localStorage.setItem("bearer_token", originalToken);
-            localStorage.removeItem("original_bearer_token");
-            localStorage.removeItem(IMPERSONATION_MODE_STORAGE_KEY);
+            restoreOriginalToken(originalToken);
             return;
         }
 
@@ -353,24 +357,46 @@ export const adminService = {
                     (error as { message?: unknown }).message === "Session not found";
 
                 if (isSessionNotFound) {
-                    localStorage.setItem("bearer_token", originalToken);
-                    localStorage.removeItem("original_bearer_token");
-                    localStorage.removeItem(IMPERSONATION_MODE_STORAGE_KEY);
+                    restoreOriginalToken(originalToken);
                     return;
                 }
 
                 throw new Error(error.message || "Failed to stop impersonating");
             }
-            localStorage.setItem("bearer_token", originalToken);
-            localStorage.removeItem("original_bearer_token");
-            localStorage.removeItem(IMPERSONATION_MODE_STORAGE_KEY);
+            restoreOriginalToken(originalToken);
         } else {
-            // Admin impersonation: use Better Auth's built-in endpoint
-            const { error } = await admin.stopImpersonating();
-            if (error) {
-                throw new Error(error.message || "Failed to stop impersonating");
+            if (mode === "org") {
+                const adminWithOrgStop = admin as typeof admin & {
+                    stopOrgImpersonating?: () => Promise<{ error: { message?: string } | null }>;
+                };
+
+                try {
+                    if (typeof adminWithOrgStop.stopOrgImpersonating === "function") {
+                        const { error } = await adminWithOrgStop.stopOrgImpersonating();
+                        if (error) {
+                            throw new Error(error.message || "Failed to stop impersonating");
+                        }
+                    } else {
+                        console.warn(
+                            "[Impersonation] org stop requested without original token, but admin.stopOrgImpersonating is unavailable; clearing local mode only.",
+                        );
+                    }
+                } finally {
+                    localStorage.removeItem(IMPERSONATION_MODE_STORAGE_KEY);
+                }
+
+                return;
             }
-            localStorage.removeItem(IMPERSONATION_MODE_STORAGE_KEY);
+
+            // Admin impersonation: use Better Auth's built-in endpoint
+            try {
+                const { error } = await admin.stopImpersonating();
+                if (error) {
+                    throw new Error(error.message || "Failed to stop impersonating");
+                }
+            } finally {
+                localStorage.removeItem(IMPERSONATION_MODE_STORAGE_KEY);
+            }
         }
     },
 

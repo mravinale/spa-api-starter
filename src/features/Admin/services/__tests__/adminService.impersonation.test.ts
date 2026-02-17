@@ -1,8 +1,14 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 
-const { mockAdminImpersonateUser, mockAdminStopImpersonating, mockFetchWithAuth } = vi.hoisted(() => ({
+const {
+    mockAdminImpersonateUser,
+    mockAdminStopImpersonating,
+    mockAdminStopOrgImpersonating,
+    mockFetchWithAuth,
+} = vi.hoisted(() => ({
     mockAdminImpersonateUser: vi.fn(),
     mockAdminStopImpersonating: vi.fn(),
+    mockAdminStopOrgImpersonating: vi.fn(),
     mockFetchWithAuth: vi.fn(),
 }));
 
@@ -10,6 +16,7 @@ vi.mock('@shared/lib/auth-client', () => ({
     admin: {
         impersonateUser: mockAdminImpersonateUser,
         stopImpersonating: mockAdminStopImpersonating,
+        stopOrgImpersonating: mockAdminStopOrgImpersonating,
     },
     organization: {},
 }));
@@ -60,6 +67,7 @@ describe('adminService.impersonateUser', () => {
                 'original_bearer_token',
                 'original-admin-token',
             );
+            expect(localStorageMock.setItem).toHaveBeenCalledWith('impersonation_mode', 'admin');
         });
 
         it('should default to admin role when no options provided', async () => {
@@ -124,6 +132,7 @@ describe('adminService.impersonateUser', () => {
 
             expect(localStorageMock.setItem).toHaveBeenCalledWith('original_bearer_token', 'original-token');
             expect(localStorageMock.setItem).toHaveBeenCalledWith('bearer_token', 'new-session-token');
+            expect(localStorageMock.setItem).toHaveBeenCalledWith('impersonation_mode', 'org');
         });
 
         it('should throw on org-scoped endpoint error', async () => {
@@ -223,6 +232,42 @@ describe('adminService.stopImpersonating', () => {
     });
 
     describe('admin stop (no original_bearer_token)', () => {
+        it('should call admin.stopOrgImpersonating when mode is org and clear mode', async () => {
+            localStorageMock.setItem('impersonation_mode', 'org');
+            vi.clearAllMocks();
+            mockAdminStopOrgImpersonating.mockResolvedValue({ error: null });
+
+            await adminService.stopImpersonating();
+
+            expect(mockAdminStopOrgImpersonating).toHaveBeenCalledTimes(1);
+            expect(mockAdminStopImpersonating).not.toHaveBeenCalled();
+            expect(localStorageMock.removeItem).toHaveBeenCalledWith('impersonation_mode');
+        });
+
+        it('should warn and clear mode when mode is org but stopOrgImpersonating is unavailable', async () => {
+            localStorageMock.setItem('impersonation_mode', 'org');
+            vi.clearAllMocks();
+            const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+            const authClient = await import('@shared/lib/auth-client');
+            const adminObj = authClient.admin as unknown as Record<string, unknown>;
+            const originalStopOrgImpersonating = adminObj.stopOrgImpersonating;
+            delete adminObj.stopOrgImpersonating;
+
+            try {
+                await adminService.stopImpersonating();
+
+                expect(mockAdminStopImpersonating).not.toHaveBeenCalled();
+                expect(warnSpy).toHaveBeenCalledWith(
+                    '[Impersonation] org stop requested without original token, but admin.stopOrgImpersonating is unavailable; clearing local mode only.',
+                );
+                expect(localStorageMock.removeItem).toHaveBeenCalledWith('impersonation_mode');
+            } finally {
+                adminObj.stopOrgImpersonating = originalStopOrgImpersonating;
+                warnSpy.mockRestore();
+            }
+        });
+
         it('should call admin.stopImpersonating when no original token', async () => {
             mockAdminStopImpersonating.mockResolvedValue({ error: null });
 
