@@ -173,6 +173,23 @@ describe('adminService.stopImpersonating', () => {
             expect(localStorageMock.removeItem).toHaveBeenCalledWith('original_bearer_token');
             expect(localStorageMock.removeItem).toHaveBeenCalledWith('impersonation_mode');
         });
+
+        it('should restore original token when admin session is already missing', async () => {
+            localStorageMock.setItem('bearer_token', 'impersonated-token');
+            localStorageMock.setItem('original_bearer_token', 'original-token');
+            localStorageMock.setItem('impersonation_mode', 'admin');
+            vi.clearAllMocks();
+            mockAdminStopImpersonating.mockResolvedValue({
+                error: { code: 'FAILED_TO_FIND_ADMIN_SESSION', message: 'Failed to find admin session' },
+            });
+
+            await expect(adminService.stopImpersonating()).resolves.toBeUndefined();
+
+            expect(mockAdminStopImpersonating).toHaveBeenCalledTimes(1);
+            expect(localStorageMock.setItem).toHaveBeenCalledWith('bearer_token', 'original-token');
+            expect(localStorageMock.removeItem).toHaveBeenCalledWith('original_bearer_token');
+            expect(localStorageMock.removeItem).toHaveBeenCalledWith('impersonation_mode');
+        });
     });
 
     describe('org-scoped stop (original_bearer_token present)', () => {
