@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - test
 
 jobs:
   deploy:
@@ -35,5 +36,10 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: us-east-1
 
-      - name: Deploy to S3
+      - name: Deploy to S3 (main)
+        if: github.ref_name == 'main'
         run: aws s3 sync dist/ s3://spa-api-starter.tierone.studio --delete
+
+      - name: Deploy to S3 (test)
+        if: github.ref_name == 'test'
+        run: aws s3 sync dist/ s3://spa-api-starter-test.tierone.studio --delete
