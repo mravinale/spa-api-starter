@@ -333,7 +333,15 @@ export const adminService = {
         if (originalToken && mode === "admin") {
             const { error } = await admin.stopImpersonating();
             if (error) {
-                throw new Error(error.message || "Failed to stop impersonating");
+                const errorCode = (error as { code?: string }).code;
+                const errorMessage = error.message || "";
+                const isMissingAdminSession =
+                    errorCode === "FAILED_TO_FIND_ADMIN_SESSION" ||
+                    errorMessage.toLowerCase().includes("failed to find admin session");
+
+                if (!isMissingAdminSession) {
+                    throw new Error(error.message || "Failed to stop impersonating");
+                }
             }
             restoreOriginalToken(originalToken);
             return;
