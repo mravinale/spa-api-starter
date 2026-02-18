@@ -24,7 +24,12 @@ jobs:
         run: npm ci
 
       - name: Use production environment
+        if: github.ref_name == 'main'
         run: cp .env.production .env
+
+      - name: Use test environment
+        if: github.ref_name == 'test'
+        run: cp .env.test .env
 
       - name: Build
         run: npm run build
