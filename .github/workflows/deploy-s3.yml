@@ -24,10 +24,20 @@ jobs:
         run: npm ci
 
       - name: Use production environment
+        if: github.ref_name == 'main'
         run: cp .env.production .env
 
-      - name: Build
+      - name: Use test environment
+        if: github.ref_name == 'test'
+        run: cp .env.test .env
+
+      - name: Build (main)
+        if: github.ref_name == 'main'
         run: npm run build
+
+      - name: Build (test)
+        if: github.ref_name == 'test'
+        run: npm run build -- --mode test
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
