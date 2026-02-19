@@ -495,18 +495,44 @@ export const organizationService = {
      * Create a new organization.
      */
     async createOrganization(params: { name: string; slug: string; logo?: string; metadata?: Record<string, unknown> }) {
-        const { data, error } = await organization.create({
-            name: params.name,
-            slug: params.slug,
-            logo: params.logo,
-            metadata: params.metadata,
+        const response = await fetchWithAuth(`${API_BASE_URL}/api/platform-admin/organizations`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                name: params.name,
+                slug: params.slug,
+                logo: params.logo,
+                metadata: params.metadata,
+            }),
         });
 
-        if (error) {
+        if (!response.ok) {
+            const error = await response.json().catch(() => ({}));
             throw new Error(error.message || "Failed to create organization");
         }
 
-        return data;
+        const result = await response.json();
+        return result.data;
+    },
+
+    /**
+     * Check whether a role can create organizations.
+     * Uses backend permission source of truth (role_permissions + PermissionsGuard).
+     */
+    async canCreateOrganization(role: string | undefined): Promise<boolean> {
+        if (!role) return false;
+        if (role === "admin") return true;
+
+        const response = await fetchWithAuth(
+            `${API_BASE_URL}/api/rbac/check/${encodeURIComponent(role)}/organization/create`,
+        );
+
+        if (!response.ok) {
+            return false;
+        }
+
+        const result = await response.json().catch(() => ({ data: { hasPermission: false } }));
+        return Boolean(result?.data?.hasPermission);
     },
 
     /**

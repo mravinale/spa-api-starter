@@ -93,16 +93,11 @@ test.describe('Roles page visibility rules', () => {
     }
   });
 
-  test('manager can open permissions dialog for visible role', async ({ page }) => {
+  test('manager should not see manage permissions action without role:assign', async ({ page }) => {
     await loginAsManager(page);
     await openRolesPage(page);
 
     const memberCard = page.locator('[data-testid="role-card-member"]');
-    await memberCard.getByRole('button', { name: /manage/i }).click();
-
-    const dialog = page.getByRole('dialog');
-    await expect(dialog).toBeVisible();
-    await expect(dialog.getByText(/manage permissions/i)).toBeVisible();
-    await expect(dialog.getByRole('button', { name: /save permissions/i })).toBeVisible();
+    await expect(memberCard.getByRole('button', { name: /manage/i })).toHaveCount(0);
   });
 });

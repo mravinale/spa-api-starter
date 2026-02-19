@@ -52,6 +52,7 @@ import { adminService } from "../services/adminService"
 import { getOrganizationRolesMetadata } from "../services/adminService"
 import { filterAssignableRoles } from "../utils/role-hierarchy"
 import { useAuth } from "@/shared/context/AuthContext"
+import { usePermissionsContext } from "@/shared/context/PermissionsContext"
 
 interface Organization {
   id: string
@@ -94,6 +95,7 @@ const getMembersArray = (data: unknown): Member[] => {
 
 export function OrganizationsPage() {
   const { user } = useAuth()
+  const { can } = usePermissionsContext()
 
   // State
   const [selectedOrg, setSelectedOrg] = useState<Organization | null>(null)
@@ -155,6 +157,11 @@ export function OrganizationsPage() {
     fetchRolesMeta()
   }, [])
 
+  const canCreateOrg = can('organization', 'create')
+  const canUpdateOrg = can('organization', 'update')
+  const canDeleteOrg = can('organization', 'delete')
+  const canInvite = can('organization', 'invite')
+
   // Check slug availability with debounce
   const handleSlugChange = async (slug: string) => {
     const formattedSlug = slug.toLowerCase().replace(/\s+/g, "-")
@@ -177,6 +184,11 @@ export function OrganizationsPage() {
 
   // Handlers
   const handleCreateOrg = async () => {
+    if (!canCreateOrg) {
+      toast.error("You do not have permission to create organizations")
+      return
+    }
+
     try {
       await createOrg.mutateAsync({
         name: newOrgData.name,
@@ -192,6 +204,11 @@ export function OrganizationsPage() {
 
   const handleUpdateOrg = async () => {
     if (!selectedOrg) return
+    if (!canUpdateOrg) {
+      toast.error("You do not have permission to update organizations")
+      return
+    }
+
     try {
       await updateOrg.mutateAsync({
         organizationId: selectedOrg.id,
@@ -206,6 +223,11 @@ export function OrganizationsPage() {
 
   const handleDeleteOrg = async () => {
     if (!selectedOrg) return
+    if (!canDeleteOrg) {
+      toast.error("You do not have permission to delete organizations")
+      return
+    }
+
     try {
       await deleteOrg.mutateAsync(selectedOrg.id)
       toast.success("Organization deleted successfully")
@@ -217,6 +239,11 @@ export function OrganizationsPage() {
   }
 
   const handleOpenAddMemberDialog = async () => {
+    if (!canInvite) {
+      toast.error("You do not have permission to invite members")
+      return
+    }
+
     setUsersLoading(true)
     try {
       const response = await adminService.listUsers({ limit: 100 })
@@ -224,7 +251,7 @@ export function OrganizationsPage() {
       const memberUserIds = members.map(m => m.userId)
       const filtered = response.data.filter((u: User) => !memberUserIds.includes(u.id))
       setAvailableUsers(filtered)
-    } catch (error) {
+    } catch {
       toast.error("Failed to load users")
     } finally {
       setUsersLoading(false)
@@ -234,6 +261,11 @@ export function OrganizationsPage() {
 
   const handleAddMember = async () => {
     if (!selectedOrg || !addMemberData.userId) return
+    if (!canInvite) {
+      toast.error("You do not have permission to invite members")
+      return
+    }
+
     try {
       await addMember.mutateAsync({
         organizationId: selectedOrg.id,
@@ -250,6 +282,11 @@ export function OrganizationsPage() {
 
   const handleRemoveMember = async () => {
     if (!selectedOrg || !selectedMember) return
+    if (!canInvite) {
+      toast.error("You do not have permission to remove members")
+      return
+    }
+
     try {
       await removeMember.mutateAsync({
         organizationId: selectedOrg.id,
@@ -265,6 +302,11 @@ export function OrganizationsPage() {
 
   const handleUpdateRole = async (memberId: string, newRole: "admin" | "manager" | "member") => {
     if (!selectedOrg) return
+    if (!canInvite) {
+      toast.error("You do not have permission to update member roles")
+      return
+    }
+
     try {
       await updateMemberRole.mutateAsync({
         organizationId: selectedOrg.id,
@@ -289,10 +331,12 @@ export function OrganizationsPage() {
           <h1 className="text-2xl font-bold">Organizations</h1>
           <p className="text-muted-foreground">Manage organizations and their members</p>
         </div>
-        <Button onClick={() => setCreateDialogOpen(true)}>
-          <IconPlus className="mr-2 h-4 w-4" />
-          Create Organization
-        </Button>
+        {canCreateOrg && (
+          <Button onClick={() => setCreateDialogOpen(true)}>
+            <IconPlus className="mr-2 h-4 w-4" />
+            Create Organization
+          </Button>
+        )}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -343,21 +387,25 @@ export function OrganizationsPage() {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => openEditDialog(org)}>
-                          <IconEdit className="mr-2 h-4 w-4" />
-                          Edit
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem
-                          className="text-destructive"
-                          onClick={() => {
-                            setSelectedOrg(org)
-                            setDeleteDialogOpen(true)
-                          }}
-                        >
-                          <IconTrash className="mr-2 h-4 w-4" />
-                          Delete
-                        </DropdownMenuItem>
+                        {canUpdateOrg && (
+                          <DropdownMenuItem onClick={() => openEditDialog(org)}>
+                            <IconEdit className="mr-2 h-4 w-4" />
+                            Edit
+                          </DropdownMenuItem>
+                        )}
+                        {canUpdateOrg && canDeleteOrg && <DropdownMenuSeparator />}
+                        {canDeleteOrg && (
+                          <DropdownMenuItem
+                            className="text-destructive"
+                            onClick={() => {
+                              setSelectedOrg(org)
+                              setDeleteDialogOpen(true)
+                            }}
+                          >
+                            <IconTrash className="mr-2 h-4 w-4" />
+                            Delete
+                          </DropdownMenuItem>
+                        )}
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </button>
@@ -408,7 +456,7 @@ export function OrganizationsPage() {
                 {selectedOrg ? `Manage members` : "Select an organization"}
               </CardDescription>
             </div>
-            {selectedOrg && (
+            {selectedOrg && canInvite && (
               <Button onClick={handleOpenAddMemberDialog}>
                 <IconUsers className="mr-2 h-4 w-4" />
                 Add Member
@@ -481,7 +529,7 @@ export function OrganizationsPage() {
                                           handleUpdateRole(member.id, value)
                                         }
                                       }}
-                                      disabled={isOnlyOwner}
+                                      disabled={isOnlyOwner || !canInvite}
                                     >
                                       <SelectTrigger className="w-32">
                                         <SelectValue placeholder="Select role" />
@@ -501,17 +549,19 @@ export function OrganizationsPage() {
                                 })()}
                               </td>
                               <td className="p-3 text-right">
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="text-destructive hover:text-destructive"
-                                  onClick={() => {
-                                    setSelectedMember(member)
-                                    setRemoveMemberDialogOpen(true)
-                                  }}
-                                >
-                                  <IconTrash className="h-4 w-4" />
-                                </Button>
+                                {canInvite && (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="text-destructive hover:text-destructive"
+                                    onClick={() => {
+                                      setSelectedMember(member)
+                                      setRemoveMemberDialogOpen(true)
+                                    }}
+                                  >
+                                    <IconTrash className="h-4 w-4" />
+                                  </Button>
+                                )}
                               </td>
                             </tr>
                           ))}

@@ -157,7 +157,7 @@ test.describe.serial('Users page permissions matrix', () => {
     await expect(page.getByRole('menuitem', { name: /delete user/i })).toBeVisible();
   });
 
-  test('manager on self should only expose edit and reset password', async ({ page }) => {
+  test('manager on self should only expose edit (no privileged actions)', async ({ page }) => {
     await loginAsManager(page);
     await openUsersPage(page);
 
@@ -165,12 +165,12 @@ test.describe.serial('Users page permissions matrix', () => {
     await openActionsMenu(selfRow);
 
     await expect(page.getByRole('menuitem', { name: /edit user/i })).toBeVisible();
-    await expect(page.getByRole('menuitem', { name: /reset password/i })).toBeVisible();
+    await expect(page.getByRole('menuitem', { name: /reset password/i })).not.toBeVisible();
     await expect(page.getByRole('menuitem', { name: /impersonate/i })).not.toBeVisible();
     await expect(page.getByRole('menuitem', { name: /change role/i })).not.toBeVisible();
   });
 
-  test('manager on member should expose manager-allowed full actions', async ({ page }) => {
+  test('manager on member should expose only manager-permitted actions', async ({ page }) => {
     await loginAsManager(page);
     await openUsersPage(page);
 
@@ -178,9 +178,10 @@ test.describe.serial('Users page permissions matrix', () => {
     await openActionsMenu(memberRow);
 
     await expect(page.getByRole('menuitem', { name: /edit user/i })).toBeVisible();
-    await expect(page.getByRole('menuitem', { name: /change role/i })).toBeVisible();
-    await expect(page.getByRole('menuitem', { name: /reset password/i })).toBeVisible();
-    await expect(page.getByRole('menuitem', { name: /impersonate/i })).toBeVisible();
+    await expect(page.getByRole('menuitem', { name: /change role/i })).not.toBeVisible();
+    await expect(page.getByRole('menuitem', { name: /reset password/i })).not.toBeVisible();
+    await expect(page.getByRole('menuitem', { name: /impersonate/i })).not.toBeVisible();
+    await expect(page.getByRole('menuitem', { name: /ban user|unban user/i })).toBeVisible();
   });
 
   test('manager should not have actions on admin or manager targets', async ({ page }) => {

@@ -157,4 +157,17 @@ export const rbacService = {
     const result: ApiResponse<{ hasPermission: boolean }> = await response.json();
     return result.data.hasPermission;
   },
+
+  /**
+   * Get the current authenticated user's effective permissions.
+   * Returns an array of permission strings like ["organization:create", "user:read"].
+   */
+  async getMyPermissions(): Promise<string[]> {
+    const response = await fetchWithAuth(`${API_BASE_URL}/api/rbac/my-permissions`);
+    if (!response.ok) {
+      return [];
+    }
+    const result: ApiResponse<string[]> = await response.json();
+    return result.data;
+  },
 };

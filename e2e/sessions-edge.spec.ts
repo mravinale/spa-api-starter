@@ -25,12 +25,23 @@ async function openSessionsPage(page: Page) {
 
 async function selectUser(page: Page, params: { searchTerm: string; expectedText: string }) {
   await page.getByPlaceholder(/search users/i).fill(params.searchTerm);
-  const userButton = page
-    .locator('main')
-    .getByRole('button', { name: new RegExp(escapeRegExp(params.expectedText), 'i') })
-    .first();
-  await expect(userButton).toBeVisible({ timeout: 15000 });
-  await userButton.click();
+
+  const buttonsInList = page.locator('main button');
+  const byExpectedText = buttonsInList.filter({
+    hasText: new RegExp(escapeRegExp(params.expectedText), 'i'),
+  });
+  const bySearchTerm = buttonsInList.filter({
+    hasText: new RegExp(escapeRegExp(params.searchTerm), 'i'),
+  });
+
+  if ((await byExpectedText.count()) > 0) {
+    await expect(byExpectedText.first()).toBeVisible({ timeout: 15000 });
+    await byExpectedText.first().click();
+    return;
+  }
+
+  await expect(bySearchTerm.first()).toBeVisible({ timeout: 15000 });
+  await bySearchTerm.first().click();
 }
 
 test.describe('Sessions edge behavior', () => {

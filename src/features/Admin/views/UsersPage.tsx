@@ -58,6 +58,7 @@ import {
 } from "../hooks/useUsers"
 import { Checkbox } from "@/shared/components/ui/checkbox"
 import { useAuth } from "@/shared/context/AuthContext"
+import { usePermissionsContext } from "@/shared/context/PermissionsContext"
 import { useOrgRole } from "@/shared/hooks/useOrgRole"
 import type { AdminUser, UserFilterParams } from "../types"
 import { adminService, type UserCapabilities } from "../services/adminService"
@@ -139,7 +140,17 @@ export function UsersPage() {
 
   // Auth context
   const { user: currentUser, refreshSession } = useAuth()
+  const { can } = usePermissionsContext()
   const { activeOrganizationId } = useOrgRole()
+
+  // DB-backed permission flags
+  const canCreateUser = can('user', 'create')
+  const canUpdateUser = can('user', 'update')
+  const canSetRole = can('user', 'set-role')
+  const canBanUser = can('user', 'ban')
+  const canSetPassword = can('user', 'set-password')
+  const canDeleteUser = can('user', 'delete')
+  const canImpersonate = can('user', 'impersonate')
 
   // Queries and mutations
   const { data, isLoading } = useUsers(queryParams)
@@ -436,21 +447,21 @@ export function UsersPage() {
         const targetRole = user.role || "member"
         const actions = capabilitiesByUserId[user.id] ?? getFallbackUserActions(currentUser?.role || "member", targetRole, isSelf)
 
-        const canUpdate = actions.update
-        const canSetRole = actions.setRole
-        const canSetPassword = actions.setPassword
-        const canBan = actions.ban
-        const canUnban = actions.unban
-        const canRemove = actions.remove
-        const canImpersonate = actions.impersonate
+        const canUpdate = actions.update && canUpdateUser
+        const canDoSetRole = actions.setRole && canSetRole
+        const canDoSetPassword = actions.setPassword && canSetPassword
+        const canBan = actions.ban && canBanUser
+        const canUnban = actions.unban && canBanUser
+        const canRemove = actions.remove && canDeleteUser
+        const canDoImpersonate = actions.impersonate && canImpersonate
         const hasAnyAction =
           canUpdate ||
-          canSetRole ||
-          canSetPassword ||
+          canDoSetRole ||
+          canDoSetPassword ||
           canBan ||
           canUnban ||
           canRemove ||
-          canImpersonate
+          canDoImpersonate
 
         if (!hasAnyAction) return null
 
@@ -474,7 +485,7 @@ export function UsersPage() {
                 <IconEdit className="mr-2 h-4 w-4" />
                 Edit User
               </DropdownMenuItem>
-              {canSetPassword && (
+              {canDoSetPassword && (
                 <DropdownMenuItem
                   onClick={() => {
                     setSelectedUser(user)
@@ -485,9 +496,9 @@ export function UsersPage() {
                   Reset Password
                 </DropdownMenuItem>
               )}
-              {(canSetRole || canImpersonate || canBan || canUnban || canRemove) && (
+              {(canDoSetRole || canDoImpersonate || canBan || canUnban || canRemove) && (
                 <>
-                  {canSetRole && (
+                  {canDoSetRole && (
                     <DropdownMenuItem
                       onClick={() => handleOpenRoleDialog(user)}
                     >
@@ -495,7 +506,7 @@ export function UsersPage() {
                       Change Role
                     </DropdownMenuItem>
                   )}
-                  {canImpersonate && (
+                  {canDoImpersonate && (
                     <DropdownMenuItem
                       onClick={() => handleImpersonateUser(user)}
                     >
@@ -544,7 +555,7 @@ export function UsersPage() {
         )
       },
     },
-  ], [currentUser, capabilitiesByUserId])
+  ], [currentUser, capabilitiesByUserId, canUpdateUser, canSetRole, canBanUser, canSetPassword, canDeleteUser, canImpersonate])
 
   return (
     <div className="flex flex-1 flex-col gap-4 p-4 lg:p-6">
@@ -575,7 +586,7 @@ export function UsersPage() {
         onRowSelectionChange={setSelectedUsers}
         toolbar={
           <div className="flex items-center gap-2">
-            {selectedUsers.length > 0 && (
+            {selectedUsers.length > 0 && canDeleteUser && (
               <Button
                 variant="destructive"
                 onClick={() => setBulkDeleteDialogOpen(true)}
@@ -584,10 +595,12 @@ export function UsersPage() {
                 Delete ({selectedUsers.length})
               </Button>
             )}
-            <Button onClick={() => handleOpenCreateDialog(true)}>
-              <IconPlus className="mr-2 h-4 w-4" />
-              Add User
-            </Button>
+            {canCreateUser && (
+              <Button onClick={() => handleOpenCreateDialog(true)}>
+                <IconPlus className="mr-2 h-4 w-4" />
+                Add User
+              </Button>
+            )}
           </div>
         }
       />
