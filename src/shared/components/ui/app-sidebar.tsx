@@ -26,65 +26,93 @@ import {
 } from "@/shared/components/ui/sidebar"
 import { OrganizationSwitcher } from "@/shared/components/OrganizationSwitcher"
 import { useAuth } from "@/shared/context/AuthContext"
+import { usePermissionsContext } from "@/shared/context/PermissionsContext"
 
 // Navigation configuration
-const getNavItems = (isAdminOrManager: boolean, pathname: string) => ({
-  navMain: [],
-  navGroups: [
-    {
-      title: "Main",
-      icon: IconHome,
-      isActive: pathname === "/",
-      items: [
-        {
-          title: "Dashboard",
-          url: "/",
-          icon: IconDashboard,
-          isActive: pathname === "/",
-        },
-      ],
-    },
-    ...(isAdminOrManager ? [
+const getNavItems = (
+  isAdminOrManager: boolean,
+  pathname: string,
+  can: (resource: string, action: string) => boolean,
+) => {
+  const adminItems: Array<{
+    title: string
+    url: string
+    icon: typeof IconUsers
+    isActive: boolean
+  }> = []
+
+  if (can("user", "read")) {
+    adminItems.push({
+      title: "Users",
+      url: "/admin/users",
+      icon: IconUsers,
+      isActive: pathname.startsWith("/admin/users"),
+    })
+  }
+
+  if (can("session", "read")) {
+    adminItems.push({
+      title: "Sessions",
+      url: "/admin/sessions",
+      icon: IconUserScan,
+      isActive: pathname === "/admin/sessions",
+    })
+  }
+
+  if (can("organization", "read")) {
+    adminItems.push({
+      title: "Organizations",
+      url: "/admin/organizations",
+      icon: IconBuilding,
+      isActive: pathname.startsWith("/admin/organizations"),
+    })
+  }
+
+  if (can("role", "read")) {
+    adminItems.push({
+      title: "Roles & Permissions",
+      url: "/admin/roles",
+      icon: IconShield,
+      isActive: pathname === "/admin/roles",
+    })
+  }
+
+  return {
+    navMain: [],
+    navGroups: [
       {
-        title: "Admin",
-        icon: IconShield,
-        isActive: pathname.startsWith("/admin"),
+        title: "Main",
+        icon: IconHome,
+        isActive: pathname === "/",
         items: [
           {
-            title: "Users",
-            url: "/admin/users",
-            icon: IconUsers,
-            isActive: pathname.startsWith("/admin/users"),
-          },
-          {
-            title: "Sessions",
-            url: "/admin/sessions",
-            icon: IconUserScan,
-            isActive: pathname === "/admin/sessions",
-          },
-          {
-            title: "Organizations",
-            url: "/admin/organizations",
-            icon: IconBuilding,
-            isActive: pathname.startsWith("/admin/organizations"),
-          },
-          {
-            title: "Roles & Permissions",
-            url: "/admin/roles",
-            icon: IconShield,
-            isActive: pathname === "/admin/roles",
+            title: "Dashboard",
+            url: "/",
+            icon: IconDashboard,
+            isActive: pathname === "/",
           },
         ],
       },
-    ] : []),
-  ],
-  navSecondary: [],
-})
+      ...(isAdminOrManager && adminItems.length > 0
+        ? [
+            {
+              title: "Admin",
+              icon: IconShield,
+              isActive: pathname.startsWith("/admin"),
+              items: adminItems,
+            },
+          ]
+        : []),
+    ],
+    navSecondary: [],
+  }
+}
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const { user, isAdminOrManager } = useAuth()
+  const { can } = usePermissionsContext()
   const location = useLocation()
-  const navItems = getNavItems(isAdminOrManager, location.pathname)
+  const navItems = getNavItems(isAdminOrManager, location.pathname, can)
 
   const userData = {
     name: user?.name ?? "User",

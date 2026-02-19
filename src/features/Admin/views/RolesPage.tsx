@@ -38,6 +38,7 @@ import { toast } from "sonner";
 import { roleColorMap, ROLE_COLORS } from "../types/rbac";
 import type { Role, Permission } from "../types/rbac";
 import { useAuth } from "@/shared/context/AuthContext";
+import { usePermissionsContext } from "@/shared/context/PermissionsContext";
 
 /**
  * Component to display permissions for a role
@@ -75,12 +76,18 @@ function RoleCard({
   onEdit,
   onDelete,
   onManagePermissions,
+  canEditRole,
+  canDeleteRole,
+  canManagePermissions,
 }: { 
   role: Role;
   permissions: Permission[];
   onEdit: () => void;
   onDelete: () => void;
   onManagePermissions: () => void;
+  canEditRole: boolean;
+  canDeleteRole: boolean;
+  canManagePermissions: boolean;
 }) {
   return (
     <Card data-testid={`role-card-${role.name}`}>
@@ -102,24 +109,30 @@ function RoleCard({
         <div className="space-y-2">
           <div className="flex items-center justify-between">
             <h4 className="text-sm font-medium text-muted-foreground">Permissions</h4>
-            <Button variant="ghost" size="sm" className="h-6 text-xs" onClick={onManagePermissions}>
-              <IconShield className="h-3 w-3 mr-1" />
-              Manage
-            </Button>
+            {canManagePermissions && (
+              <Button variant="ghost" size="sm" className="h-6 text-xs" onClick={onManagePermissions}>
+                <IconShield className="h-3 w-3 mr-1" />
+                Manage
+              </Button>
+            )}
           </div>
           <PermissionBadges permissions={permissions} />
         </div>
 
         {/* Actions */}
-        {!role.isSystem && (
+        {!role.isSystem && (canEditRole || canDeleteRole) && (
           <div className="flex gap-2 pt-2 border-t">
-            <Button variant="outline" size="sm" className="flex-1" onClick={onEdit}>
-              <IconEdit className="h-4 w-4 mr-1" />
-              Edit
-            </Button>
-            <Button variant="outline" size="sm" className="text-destructive" onClick={onDelete}>
-              <IconTrash className="h-4 w-4" />
-            </Button>
+            {canEditRole && (
+              <Button variant="outline" size="sm" className="flex-1" onClick={onEdit}>
+                <IconEdit className="h-4 w-4 mr-1" />
+                Edit
+              </Button>
+            )}
+            {canDeleteRole && (
+              <Button variant="outline" size="sm" className="text-destructive" onClick={onDelete}>
+                <IconTrash className="h-4 w-4" />
+              </Button>
+            )}
           </div>
         )}
       </CardContent>
@@ -135,6 +148,7 @@ function RoleCard({
  */
 export function RolesPage() {
   const { isAdmin } = useAuth();
+  const { can } = usePermissionsContext();
   const { data: allRoles = [], isLoading } = useRoles();
   
   // Managers can only see and edit the "member" role
@@ -144,6 +158,11 @@ export function RolesPage() {
   const updateRole = useUpdateRole();
   const deleteRole = useDeleteRole();
   const assignPermissions = useAssignPermissions();
+
+  const canCreateRole = can("role", "create");
+  const canUpdateRole = can("role", "update");
+  const canDeleteRole = can("role", "delete");
+  const canAssignRolePermissions = can("role", "assign");
   
   // State for role permissions (fetched individually)
   const [rolePermissions, setRolePermissions] = useState<Record<string, Permission[]>>({});
@@ -199,6 +218,11 @@ export function RolesPage() {
   }, [roles, fetchRolePermissions]);
 
   const handleCreateRole = async () => {
+    if (!canCreateRole) {
+      toast.error("You do not have permission to create roles");
+      return;
+    }
+
     try {
       await createRole.mutateAsync({
         name: formData.name,
@@ -209,13 +233,18 @@ export function RolesPage() {
       toast.success("Role created successfully");
       setCreateDialogOpen(false);
       setFormData({ name: "", displayName: "", description: "", color: "gray" });
-    } catch (error) {
+    } catch {
       toast.error("Failed to create role");
     }
   };
 
   const handleUpdateRole = async () => {
     if (!selectedRole) return;
+    if (!canUpdateRole) {
+      toast.error("You do not have permission to update roles");
+      return;
+    }
+
     try {
       await updateRole.mutateAsync({
         id: selectedRole.id,
@@ -228,25 +257,35 @@ export function RolesPage() {
       toast.success("Role updated successfully");
       setEditDialogOpen(false);
       setSelectedRole(null);
-    } catch (error) {
+    } catch {
       toast.error("Failed to update role");
     }
   };
 
   const handleDeleteRole = async () => {
     if (!selectedRole) return;
+    if (!canDeleteRole) {
+      toast.error("You do not have permission to delete roles");
+      return;
+    }
+
     try {
       await deleteRole.mutateAsync(selectedRole.id);
       toast.success("Role deleted successfully");
       setDeleteDialogOpen(false);
       setSelectedRole(null);
-    } catch (error) {
+    } catch {
       toast.error("Failed to delete role");
     }
   };
 
   const handleAssignPermissions = async () => {
     if (!selectedRole) return;
+    if (!canAssignRolePermissions) {
+      toast.error("You do not have permission to assign role permissions");
+      return;
+    }
+
     try {
       await assignPermissions.mutateAsync({
         roleId: selectedRole.id,
@@ -257,7 +296,7 @@ export function RolesPage() {
       toast.success("Permissions updated successfully");
       setPermissionsDialogOpen(false);
       setSelectedRole(null);
-    } catch (error) {
+    } catch {
       toast.error("Failed to update permissions");
     }
   };
@@ -274,6 +313,11 @@ export function RolesPage() {
   };
 
   const openPermissionsDialog = (role: Role) => {
+    if (!canAssignRolePermissions) {
+      toast.error("You do not have permission to manage role permissions");
+      return;
+    }
+
     setSelectedRole(role);
     const perms = rolePermissions[role.id] || [];
     setSelectedPermissionIds(perms.map((p) => p.id));
@@ -294,7 +338,7 @@ export function RolesPage() {
             Manage role-based access control for your application
           </p>
         </div>
-        {isAdmin && (
+        {isAdmin && canCreateRole && (
           <Button onClick={() => setCreateDialogOpen(true)}>
             <IconPlus className="h-4 w-4 mr-2" />
             Create Role
@@ -312,6 +356,9 @@ export function RolesPage() {
             onEdit={() => openEditDialog(role)}
             onDelete={() => { setSelectedRole(role); setDeleteDialogOpen(true); }}
             onManagePermissions={() => openPermissionsDialog(role)}
+            canEditRole={canUpdateRole}
+            canDeleteRole={canDeleteRole}
+            canManagePermissions={canAssignRolePermissions}
           />
         ))}
       </div>
@@ -462,6 +509,7 @@ export function RolesPage() {
                       <Checkbox
                         id={perm.id}
                         checked={selectedPermissionIds.includes(perm.id)}
+                        disabled={!canAssignRolePermissions}
                         onCheckedChange={(checked) => {
                           if (checked) {
                             setSelectedPermissionIds([...selectedPermissionIds, perm.id]);
@@ -484,7 +532,7 @@ export function RolesPage() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setPermissionsDialogOpen(false)}>Cancel</Button>
-            <Button onClick={handleAssignPermissions} disabled={assignPermissions.isPending}>
+            <Button onClick={handleAssignPermissions} disabled={assignPermissions.isPending || !canAssignRolePermissions}>
               {assignPermissions.isPending ? "Saving..." : "Save Permissions"}
             </Button>
           </DialogFooter>

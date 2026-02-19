@@ -15,6 +15,7 @@ import RootLayout from "./RootLayout";
 import { useInitializeApp } from "../hooks/useInitializeApp";
 import { ThemeProvider } from "@shared/components/ui";
 import { AuthProvider } from "@shared/context/AuthContext";
+import { PermissionsProvider } from "@shared/context/PermissionsContext";
 import { ProtectedRoute } from "@shared/components/ProtectedRoute";
 import { AdminRoute } from "@shared/components/AdminRoute";
 import { Toaster } from "@shared/components/ui/sonner";
@@ -29,6 +30,7 @@ const AppRoutes = () => {
       <BrowserRouter>
         <QueryClientProvider client={queryClient}>
           <AuthProvider>
+          <PermissionsProvider>
             <Routes>
               {/* Auth routes */}
               <Route path="/login" element={<LoginPage />} />
@@ -53,7 +55,7 @@ const AppRoutes = () => {
                 <Route
                   path="admin/users"
                   element={
-                    <AdminRoute>
+                    <AdminRoute requiredPermission={{ resource: "user", action: "read" }}>
                       <UsersPage />
                     </AdminRoute>
                   }
@@ -61,7 +63,7 @@ const AppRoutes = () => {
                 <Route
                   path="admin/sessions"
                   element={
-                    <AdminRoute>
+                    <AdminRoute requiredPermission={{ resource: "session", action: "read" }}>
                       <SessionsPage />
                     </AdminRoute>
                   }
@@ -69,7 +71,7 @@ const AppRoutes = () => {
                 <Route
                   path="admin/organizations"
                   element={
-                    <AdminRoute>
+                    <AdminRoute requiredPermission={{ resource: "organization", action: "read" }}>
                       <OrganizationsPage />
                     </AdminRoute>
                   }
@@ -77,7 +79,7 @@ const AppRoutes = () => {
                 <Route
                   path="admin/roles"
                   element={
-                    <AdminRoute>
+                    <AdminRoute requiredPermission={{ resource: "role", action: "read" }}>
                       <RolesPage />
                     </AdminRoute>
                   }
@@ -85,6 +87,7 @@ const AppRoutes = () => {
               </Route>
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
+          </PermissionsProvider>
           </AuthProvider>
           <Toaster richColors position="top-right" />
         </QueryClientProvider>

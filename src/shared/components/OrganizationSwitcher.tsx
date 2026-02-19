@@ -30,6 +30,8 @@ import { Label } from "@/shared/components/ui/label"
 import { Skeleton } from "@/shared/components/ui/skeleton"
 
 import { organization } from "@/shared/lib/auth-client"
+import { usePermissionsContext } from "@/shared/context/PermissionsContext"
+import { organizationService } from "@/features/Admin/services/adminService"
 
 interface Organization {
   id: string
@@ -39,11 +41,13 @@ interface Organization {
 }
 
 export function OrganizationSwitcher() {
+  const { can } = usePermissionsContext()
   const [createDialogOpen, setCreateDialogOpen] = useState(false)
   const [newOrgData, setNewOrgData] = useState({ name: "", slug: "" })
   const [organizations, setOrganizations] = useState<Organization[]>([])
   const [activeMember, setActiveMember] = useState<{ organizationId?: string } | null>(null)
   const [orgsLoading, setOrgsLoading] = useState(true)
+  const canCreateOrganization = can("organization", "create")
 
   // Fetch organizations using Better Auth client
   useEffect(() => {
@@ -115,9 +119,14 @@ export function OrganizationSwitcher() {
   }
 
   const handleCreateOrg = async () => {
+    if (!canCreateOrganization) {
+      toast.error("You do not have permission to create organizations")
+      return
+    }
+
     setIsLoading(true)
     try {
-      await organization.create({
+      await organizationService.createOrganization({
         name: newOrgData.name,
         slug: newOrgData.slug.toLowerCase().replace(/\s+/g, "-"),
       })
@@ -187,11 +196,15 @@ export function OrganizationSwitcher() {
               </DropdownMenuItem>
             ))
           )}
-          <DropdownMenuSeparator />
-          <DropdownMenuItem onClick={() => setCreateDialogOpen(true)}>
-            <IconPlus className="mr-2 h-4 w-4" />
-            Create Organization
-          </DropdownMenuItem>
+          {canCreateOrganization && (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => setCreateDialogOpen(true)}>
+                <IconPlus className="mr-2 h-4 w-4" />
+                Create Organization
+              </DropdownMenuItem>
+            </>
+          )}
           {activeOrg && (
             <>
               <DropdownMenuSeparator />

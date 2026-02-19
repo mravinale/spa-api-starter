@@ -16,6 +16,7 @@ import type {
  */
 export const rbacKeys = {
   all: ["rbac"] as const,
+  myPermissions: () => [...rbacKeys.all, "my-permissions"] as const,
   roles: () => [...rbacKeys.all, "roles"] as const,
   role: (id: string) => [...rbacKeys.all, "role", id] as const,
   permissions: () => [...rbacKeys.all, "permissions"] as const,
@@ -57,6 +58,7 @@ export function useCreateRole() {
     mutationFn: (dto: CreateRoleDto) => rbacService.createRole(dto),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: rbacKeys.roles() });
+      queryClient.invalidateQueries({ queryKey: rbacKeys.myPermissions() });
     },
   });
 }
@@ -73,6 +75,7 @@ export function useUpdateRole() {
     onSuccess: (_, { id }) => {
       queryClient.invalidateQueries({ queryKey: rbacKeys.roles() });
       queryClient.invalidateQueries({ queryKey: rbacKeys.role(id) });
+      queryClient.invalidateQueries({ queryKey: rbacKeys.myPermissions() });
     },
   });
 }
@@ -87,6 +90,7 @@ export function useDeleteRole() {
     mutationFn: (id: string) => rbacService.deleteRole(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: rbacKeys.roles() });
+      queryClient.invalidateQueries({ queryKey: rbacKeys.myPermissions() });
     },
   });
 }
@@ -103,6 +107,7 @@ export function useAssignPermissions() {
     onSuccess: (_, { roleId }) => {
       queryClient.invalidateQueries({ queryKey: rbacKeys.roles() });
       queryClient.invalidateQueries({ queryKey: rbacKeys.role(roleId) });
+      queryClient.invalidateQueries({ queryKey: rbacKeys.myPermissions() });
     },
   });
 }

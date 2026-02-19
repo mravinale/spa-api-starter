@@ -28,6 +28,7 @@ import {
   useRevokeAllSessions,
 } from "../hooks/useUsers"
 import type { AdminUser, UserSession } from "../types"
+import { usePermissionsContext } from "@/shared/context/PermissionsContext"
 
 // Parse user agent to determine device type
 const getDeviceInfo = (userAgent?: string) => {
@@ -46,6 +47,8 @@ export function SessionsPage() {
   const [searchValue, setSearchValue] = useState("")
   const [selectedUser, setSelectedUser] = useState<AdminUser | null>(null)
   const [revokeAllDialogOpen, setRevokeAllDialogOpen] = useState(false)
+  const { can } = usePermissionsContext()
+  const canRevokeSessions = can("session", "revoke")
 
   // Queries
   const { data: usersData, isLoading: usersLoading } = useUsers({
@@ -66,6 +69,11 @@ export function SessionsPage() {
 
   // Handlers
   const handleRevokeSession = async (session: UserSession) => {
+    if (!canRevokeSessions) {
+      toast.error("You do not have permission to revoke sessions")
+      return
+    }
+
     try {
       await revokeSession.mutateAsync(session.token)
       toast.success("Session revoked successfully")
@@ -77,6 +85,11 @@ export function SessionsPage() {
 
   const handleRevokeAllSessions = async () => {
     if (!selectedUser) return
+    if (!canRevokeSessions) {
+      toast.error("You do not have permission to revoke sessions")
+      return
+    }
+
     try {
       await revokeAllSessions.mutateAsync(selectedUser.id)
       toast.success("All sessions revoked successfully")
@@ -183,14 +196,16 @@ export function SessionsPage() {
                   <IconRefresh className="h-4 w-4 mr-2" />
                   Refresh
                 </Button>
-                <Button
-                  variant="destructive"
-                  size="sm"
-                  onClick={() => setRevokeAllDialogOpen(true)}
-                  disabled={!sessions?.length}
-                >
-                  Revoke All
-                </Button>
+                {canRevokeSessions && (
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    onClick={() => setRevokeAllDialogOpen(true)}
+                    disabled={!sessions?.length}
+                  >
+                    Revoke All
+                  </Button>
+                )}
               </div>
             )}
           </CardHeader>
@@ -238,14 +253,16 @@ export function SessionsPage() {
                             </Badge>
                           </td>
                           <td className="p-3 text-right">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="text-destructive hover:text-destructive"
-                              onClick={() => handleRevokeSession(session)}
-                            >
-                              <IconTrash className="h-4 w-4" />
-                            </Button>
+                            {canRevokeSessions && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="text-destructive hover:text-destructive"
+                                onClick={() => handleRevokeSession(session)}
+                              >
+                                <IconTrash className="h-4 w-4" />
+                              </Button>
+                            )}
                           </td>
                         </tr>
                       )
