@@ -463,17 +463,18 @@ export function UsersPage() {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem
-                onClick={() => {
-                  setSelectedUser(user)
-                  setEditUserData({ name: user.name || "" })
-                  setEditDialogOpen(true)
-                }}
-                disabled={!canUpdate}
-              >
-                <IconEdit className="mr-2 h-4 w-4" />
-                Edit User
-              </DropdownMenuItem>
+              {canUpdate && (
+                <DropdownMenuItem
+                  onClick={() => {
+                    setSelectedUser(user)
+                    setEditUserData({ name: user.name || "" })
+                    setEditDialogOpen(true)
+                  }}
+                >
+                  <IconEdit className="mr-2 h-4 w-4" />
+                  Edit User
+                </DropdownMenuItem>
+              )}
               {canSetPassword && (
                 <DropdownMenuItem
                   onClick={() => {
