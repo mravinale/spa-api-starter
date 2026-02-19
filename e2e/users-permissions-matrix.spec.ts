@@ -177,15 +177,11 @@ test.describe.serial('Users page permissions matrix', () => {
     const memberRow = await findUserRowByEmail(page, memberTargetEmail);
     await openActionsMenu(memberRow);
 
-    // UsersPage renders the menu only when hasAnyAction is true.
-    // Edit User may still be rendered disabled when !canUpdate, so assert usable state.
-    const editUserMenuItem = page.getByRole('menuitem', { name: /edit user/i });
-    await expect(editUserMenuItem).toBeVisible();
-    await expect(editUserMenuItem).not.toBeDisabled();
-
-    await expect(page.getByRole('menuitem', { name: /change role/i })).toBeVisible();
-    await expect(page.getByRole('menuitem', { name: /reset password/i })).toBeVisible();
-    await expect(page.getByRole('menuitem', { name: /impersonate/i })).toBeVisible();
+    await expect(page.getByRole('menuitem', { name: /edit user/i })).toBeVisible();
+    await expect(page.getByRole('menuitem', { name: /change role/i })).not.toBeVisible();
+    await expect(page.getByRole('menuitem', { name: /reset password/i })).not.toBeVisible();
+    await expect(page.getByRole('menuitem', { name: /impersonate/i })).not.toBeVisible();
+    await expect(page.getByRole('menuitem', { name: /ban user|unban user/i })).toBeVisible();
   });
 
   test('manager should not have actions on admin or manager targets', async ({ page }) => {
