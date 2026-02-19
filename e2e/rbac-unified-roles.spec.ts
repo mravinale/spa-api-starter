@@ -231,7 +231,7 @@ test.describe('Admin Role - Full Platform Access', () => {
 
     await page.goto('/admin/users');
     await page.waitForLoadState('networkidle');
-    await page.waitForSelector('table tbody tr', { timeout: 15000 });
+    await expect(page.getByRole('heading', { name: /users/i })).toBeVisible({ timeout: 15000 });
 
     const searchInput = page.getByPlaceholder(/search users/i);
     await expect(searchInput).toBeVisible({ timeout: 10000 });
@@ -354,24 +354,18 @@ test.describe('Manager Role - Organization-Scoped Access', () => {
     await expect(page.getByRole('link', { name: /organizations/i })).toBeVisible();
   });
 
-  test('should access Users page and gate create-user UI by permission', async ({ page }) => {
+  test('should access Users page and show create-user UI for manager role', async ({ page }) => {
     await page.goto('/admin/users');
     await expect(page.getByRole('heading', { name: /users/i })).toBeVisible();
 
     const addUserButton = page.getByRole('button', { name: /add user/i });
-    if (await addUserButton.isVisible().catch(() => false)) {
-      await addUserButton.click();
-      const dialog = page.getByRole('dialog');
-      await expect(dialog).toBeVisible();
+    await expect(addUserButton).toBeVisible();
+    await addUserButton.click();
 
-      // Organization selector should be visible (proves backend metadata endpoint works and org is required)
-      await expect(dialog.getByText('Organization', { exact: true })).toBeVisible();
-
-      // Role selector should be visible
-      await expect(dialog.getByText('Role', { exact: true })).toBeVisible();
-    } else {
-      await expect(addUserButton).not.toBeVisible();
-    }
+    const dialog = page.getByRole('dialog');
+    await expect(dialog).toBeVisible();
+    await expect(dialog.getByText('Organization', { exact: true })).toBeVisible();
+    await expect(dialog.getByText('Role', { exact: true })).toBeVisible();
   });
 
   test('manager should see self actions constrained by permissions', async ({ page }) => {

@@ -157,7 +157,6 @@ export const rbacService = {
     const result: ApiResponse<{ hasPermission: boolean }> = await response.json();
     return result.data.hasPermission;
   },
-
   /**
    * Get the current authenticated user's effective permissions.
    * Returns an array of permission strings like ["organization:create", "user:read"].
@@ -167,7 +166,11 @@ export const rbacService = {
     if (!response.ok) {
       return [];
     }
-    const result: ApiResponse<string[]> = await response.json();
-    return result.data;
+    const result: ApiResponse<unknown> | null = await response.json().catch(() => null);
+    if (!result || !Array.isArray(result.data)) {
+      return [];
+    }
+
+    return result.data.filter((permission): permission is string => typeof permission === "string");
   },
 };

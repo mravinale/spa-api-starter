@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { Pool } from 'pg';
 import { DATABASE_URL, API_BASE_URL, TEST_USER } from './env';
-import { escapeRegExp } from './test-helpers';
+import { escapeRegExp, loginWithCredentials } from './test-helpers';
 import { resendTestEmail } from '../src/shared/utils/resendTestEmail';
 
 const IMPERSONATION_ORG_SLUG = 'e2e-impersonation-org';
@@ -107,21 +107,18 @@ async function findOrganizationCardBySlug(page: import('@playwright/test').Page,
 
 // Helper to login
 async function login(page: import('@playwright/test').Page, email = TEST_USER.email, password = TEST_USER.password) {
-  await page.goto('/login');
-  await page.getByLabel('Email').fill(email);
-  await page.getByLabel('Password').fill(password);
-  await page.getByRole('button', { name: /^login$/i }).click();
-  await expect(page).toHaveURL('/', { timeout: 10000 });
+  await loginWithCredentials(page, email, password);
 }
 
 // Helper to login as admin and navigate to admin page
 async function loginAsAdmin(page: import('@playwright/test').Page, adminPath: string) {
   await login(page);
-  await page.goto(adminPath);
+  await page.goto(adminPath, { waitUntil: 'domcontentloaded' });
+  await page.waitForLoadState('networkidle');
   
   // Wait for specific UI elements based on the path
   if (adminPath.includes('/admin/users')) {
-    await page.waitForSelector('table tbody tr', { timeout: 15000 });
+    await expect(page.getByRole('heading', { name: /users/i })).toBeVisible({ timeout: 15000 });
   } else if (adminPath.includes('/admin/organizations')) {
     await expect(page.getByRole('heading', { name: /organizations/i })).toBeVisible({ timeout: 15000 });
   } else if (adminPath.includes('/admin/roles')) {
