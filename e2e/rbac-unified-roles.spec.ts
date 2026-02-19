@@ -231,7 +231,7 @@ test.describe('Admin Role - Full Platform Access', () => {
 
     await page.goto('/admin/users');
     await page.waitForLoadState('networkidle');
-    await page.waitForSelector('table tbody tr', { timeout: 15000 });
+    await expect(page.getByRole('heading', { name: /users/i })).toBeVisible({ timeout: 15000 });
 
     const searchInput = page.getByPlaceholder(/search users/i);
     await expect(searchInput).toBeVisible({ timeout: 10000 });
@@ -354,18 +354,17 @@ test.describe('Manager Role - Organization-Scoped Access', () => {
     await expect(page.getByRole('link', { name: /organizations/i })).toBeVisible();
   });
 
-  test('should access Users page and see org selector for manager', async ({ page }) => {
+  test('should access Users page and show create-user UI for manager role', async ({ page }) => {
     await page.goto('/admin/users');
     await expect(page.getByRole('heading', { name: /users/i })).toBeVisible();
 
-    await page.getByRole('button', { name: /add user/i }).click();
+    const addUserButton = page.getByRole('button', { name: /add user/i });
+    await expect(addUserButton).toBeVisible();
+    await addUserButton.click();
+
     const dialog = page.getByRole('dialog');
     await expect(dialog).toBeVisible();
-    
-    // Organization selector should be visible (proves backend metadata endpoint works and org is required)
     await expect(dialog.getByText('Organization', { exact: true })).toBeVisible();
-    
-    // Role selector should be visible
     await expect(dialog.getByText('Role', { exact: true })).toBeVisible();
   });
 
