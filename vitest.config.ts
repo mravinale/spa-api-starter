@@ -11,13 +11,15 @@ export default defineConfig({
     include: ['src/**/*.test.{ts,tsx}'],
     coverage: {
       provider: 'v8',
-      reporter: ['text', 'json', 'html'],
+      reporter: ['text', 'text-summary', 'json', 'html'],
       exclude: [
         'node_modules/',
         'src/test/',
         '**/*.d.ts',
         'src/main.tsx',
         'src/vite-env.d.ts',
+        '**/*.test.{ts,tsx}',
+        '**/*.spec.{ts,tsx}',
       ],
     },
   },

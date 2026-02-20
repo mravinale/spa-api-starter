@@ -5,10 +5,17 @@ import type { ReactNode } from 'react';
 import {
   useUsers,
   useCreateUser,
+  useUpdateUser,
+  useRemoveUser,
+  useRemoveUsers,
   useBanUser,
   useUnbanUser,
   useSetUserRole,
+  useSetUserPassword,
   useUserCapabilities,
+  useUserSessions,
+  useRevokeSession,
+  useRevokeAllSessions,
   useImpersonateUser,
   useStopImpersonating,
   userKeys,
@@ -20,12 +27,14 @@ vi.mock('../../services/adminService', () => ({
   adminService: {
     listUsers: vi.fn(),
     createUser: vi.fn(),
+    updateUser: vi.fn(),
+    removeUser: vi.fn(),
+    removeUsers: vi.fn(),
     banUser: vi.fn(),
     unbanUser: vi.fn(),
     setRole: vi.fn(),
     getUserCapabilities: vi.fn(),
     setPassword: vi.fn(),
-    removeUser: vi.fn(),
     listUserSessions: vi.fn(),
     revokeSession: vi.fn(),
     revokeAllSessions: vi.fn(),
@@ -301,6 +310,113 @@ describe('useStopImpersonating hook', () => {
     await result.current.mutateAsync();
 
     expect(adminService.stopImpersonating).toHaveBeenCalled();
+  });
+});
+
+describe('useUpdateUser hook', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it('calls adminService.updateUser and invalidates queries on success', async () => {
+    (adminService.updateUser as Mock).mockResolvedValue({ id: '1', name: 'Updated' });
+
+    const { result } = renderHook(() => useUpdateUser(), { wrapper: createWrapper() });
+
+    await result.current.mutateAsync({ userId: '1', data: { name: 'Updated' } });
+
+    expect(adminService.updateUser).toHaveBeenCalledWith({ userId: '1', data: { name: 'Updated' } });
+  });
+});
+
+describe('useRemoveUser hook', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it('calls adminService.removeUser and invalidates queries on success', async () => {
+    (adminService.removeUser as Mock).mockResolvedValue(undefined);
+
+    const { result } = renderHook(() => useRemoveUser(), { wrapper: createWrapper() });
+
+    await result.current.mutateAsync('user-1');
+
+    expect(adminService.removeUser).toHaveBeenCalledWith('user-1');
+  });
+});
+
+describe('useRemoveUsers hook', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it('calls adminService.removeUsers with array of ids', async () => {
+    (adminService.removeUsers as Mock).mockResolvedValue({ success: true, deletedCount: 2 });
+
+    const { result } = renderHook(() => useRemoveUsers(), { wrapper: createWrapper() });
+
+    await result.current.mutateAsync(['user-1', 'user-2']);
+
+    expect(adminService.removeUsers).toHaveBeenCalledWith(['user-1', 'user-2']);
+  });
+});
+
+describe('useSetUserPassword hook', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it('calls adminService.setPassword', async () => {
+    (adminService.setPassword as Mock).mockResolvedValue(undefined);
+
+    const { result } = renderHook(() => useSetUserPassword(), { wrapper: createWrapper() });
+
+    await result.current.mutateAsync({ userId: 'user-1', newPassword: 'NewPass123!' });
+
+    expect(adminService.setPassword).toHaveBeenCalledWith({ userId: 'user-1', newPassword: 'NewPass123!' });
+  });
+});
+
+describe('useUserSessions hook', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it('fetches sessions for a user when userId is provided', async () => {
+    const sessions = [{ id: 'sess-1', token: 'tok-1' }];
+    (adminService.listUserSessions as Mock).mockResolvedValue(sessions);
+
+    const { result } = renderHook(() => useUserSessions('user-1'), { wrapper: createWrapper() });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+    expect(adminService.listUserSessions).toHaveBeenCalledWith('user-1');
+    expect(result.current.data).toEqual(sessions);
+  });
+
+  it('does not fetch when userId is empty string — covers enabled: !!userId branch', async () => {
+    const { result } = renderHook(() => useUserSessions(''), { wrapper: createWrapper() });
+
+    expect(result.current.fetchStatus).toBe('idle');
+    expect(adminService.listUserSessions).not.toHaveBeenCalled();
+  });
+});
+
+describe('useRevokeSession hook', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it('calls adminService.revokeSession and invalidates queries', async () => {
+    (adminService.revokeSession as Mock).mockResolvedValue(undefined);
+
+    const { result } = renderHook(() => useRevokeSession(), { wrapper: createWrapper() });
+
+    await result.current.mutateAsync('tok-abc');
+
+    expect(adminService.revokeSession).toHaveBeenCalledWith('tok-abc');
+  });
+});
+
+describe('useRevokeAllSessions hook', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it('calls adminService.revokeAllSessions and invalidates queries', async () => {
+    (adminService.revokeAllSessions as Mock).mockResolvedValue(undefined);
+
+    const { result } = renderHook(() => useRevokeAllSessions(), { wrapper: createWrapper() });
+
+    await result.current.mutateAsync('user-1');
+
+    expect(adminService.revokeAllSessions).toHaveBeenCalledWith('user-1');
   });
 });
 

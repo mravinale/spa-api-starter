@@ -4,9 +4,16 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 import {
   useRoles,
+  useRole,
   useUsersByRole,
   useCreateRole,
+  useUpdateRole,
   useDeleteRole,
+  useAssignPermissions,
+  usePermissions,
+  usePermissionsGrouped,
+  useUserPermissions,
+  useCheckPermission,
   rbacKeys,
 } from "../useRoles";
 import { rbacService } from "../../services/rbacService";
@@ -156,6 +163,148 @@ describe("useRoles hooks", () => {
       await result.current.mutateAsync("role-1");
 
       expect(mockRbacService.deleteRole).toHaveBeenCalledWith("role-1");
+    });
+  });
+
+  describe("useRole", () => {
+    it("should fetch a single role by id", async () => {
+      const mockRole = { id: "1", name: "admin", displayName: "Admin", permissions: [] };
+      (mockRbacService as any).getRole = vi.fn().mockResolvedValue(mockRole);
+
+      const { result } = renderHook(() => useRole("1"), {
+        wrapper: createWrapper(),
+      });
+
+      await waitFor(() => expect(result.current.isSuccess).toBe(true));
+      expect(result.current.data).toEqual(mockRole);
+      expect((mockRbacService as any).getRole).toHaveBeenCalledWith("1");
+    });
+
+    it("should be disabled when id is empty", () => {
+      const { result } = renderHook(() => useRole(""), {
+        wrapper: createWrapper(),
+      });
+
+      expect(result.current.fetchStatus).toBe("idle");
+    });
+  });
+
+  describe("useUpdateRole", () => {
+    it("should update a role", async () => {
+      const updated = { id: "1", name: "admin", displayName: "Super Admin" };
+      (mockRbacService as any).updateRole = vi.fn().mockResolvedValue(updated);
+
+      const { result } = renderHook(() => useUpdateRole(), {
+        wrapper: createWrapper(),
+      });
+
+      await result.current.mutateAsync({ id: "1", dto: { displayName: "Super Admin" } });
+
+      expect((mockRbacService as any).updateRole).toHaveBeenCalledWith("1", { displayName: "Super Admin" });
+    });
+  });
+
+  describe("useAssignPermissions", () => {
+    it("should assign permissions to a role", async () => {
+      const roleWithPerms = { id: "1", name: "manager", permissions: [{ id: "p1" }] };
+      (mockRbacService as any).assignPermissions = vi.fn().mockResolvedValue(roleWithPerms);
+
+      const { result } = renderHook(() => useAssignPermissions(), {
+        wrapper: createWrapper(),
+      });
+
+      await result.current.mutateAsync({ roleId: "1", dto: { permissionIds: ["p1"] } });
+
+      expect((mockRbacService as any).assignPermissions).toHaveBeenCalledWith("1", { permissionIds: ["p1"] });
+    });
+  });
+
+  describe("usePermissions", () => {
+    it("should fetch all permissions", async () => {
+      const perms = [{ id: "p1", resource: "user", action: "read", description: null }];
+      (mockRbacService as any).getPermissions = vi.fn().mockResolvedValue(perms);
+
+      const { result } = renderHook(() => usePermissions(), {
+        wrapper: createWrapper(),
+      });
+
+      await waitFor(() => expect(result.current.isSuccess).toBe(true));
+      expect(result.current.data).toEqual(perms);
+    });
+  });
+
+  describe("usePermissionsGrouped", () => {
+    it("should fetch permissions grouped by resource", async () => {
+      const grouped = { user: [{ id: "p1", resource: "user", action: "read", description: null }] };
+      (mockRbacService as any).getPermissionsGrouped = vi.fn().mockResolvedValue(grouped);
+
+      const { result } = renderHook(() => usePermissionsGrouped(), {
+        wrapper: createWrapper(),
+      });
+
+      await waitFor(() => expect(result.current.isSuccess).toBe(true));
+      expect(result.current.data).toEqual(grouped);
+    });
+  });
+
+  describe("useUserPermissions", () => {
+    it("should fetch permissions for a role name", async () => {
+      const perms = [{ id: "p1", resource: "user", action: "read", description: null }];
+      (mockRbacService as any).getUserPermissions = vi.fn().mockResolvedValue(perms);
+
+      const { result } = renderHook(() => useUserPermissions("manager"), {
+        wrapper: createWrapper(),
+      });
+
+      await waitFor(() => expect(result.current.isSuccess).toBe(true));
+      expect(result.current.data).toEqual(perms);
+      expect((mockRbacService as any).getUserPermissions).toHaveBeenCalledWith("manager");
+    });
+
+    it("should be disabled when roleName is empty", () => {
+      const { result } = renderHook(() => useUserPermissions(""), {
+        wrapper: createWrapper(),
+      });
+
+      expect(result.current.fetchStatus).toBe("idle");
+    });
+  });
+
+  describe("useCheckPermission", () => {
+    it("should check if a role has a permission", async () => {
+      (mockRbacService as any).checkPermission = vi.fn().mockResolvedValue(true);
+
+      const { result } = renderHook(
+        () => useCheckPermission("manager", "user", "read"),
+        { wrapper: createWrapper() },
+      );
+
+      await waitFor(() => expect(result.current.isSuccess).toBe(true));
+      expect(result.current.data).toBe(true);
+      expect((mockRbacService as any).checkPermission).toHaveBeenCalledWith("manager", "user", "read");
+    });
+
+    it("should be disabled when roleName is empty", () => {
+      const { result } = renderHook(
+        () => useCheckPermission("", "user", "read"),
+        { wrapper: createWrapper() },
+      );
+
+      expect(result.current.fetchStatus).toBe("idle");
+    });
+  });
+
+  describe("rbacKeys completeness", () => {
+    it("should generate myPermissions key", () => {
+      expect(rbacKeys.myPermissions()).toEqual(["rbac", "my-permissions"]);
+    });
+
+    it("should generate permissionsGrouped key", () => {
+      expect(rbacKeys.permissionsGrouped()).toEqual(["rbac", "permissions", "grouped"]);
+    });
+
+    it("should generate userPermissions key", () => {
+      expect(rbacKeys.userPermissions("admin")).toEqual(["rbac", "userPermissions", "admin"]);
     });
   });
 });
