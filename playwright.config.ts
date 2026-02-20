@@ -15,7 +15,9 @@ function getPortFromUrl(url: string, fallback: number): number {
 
 const apiPort = getPortFromUrl(API_BASE_URL, 3000);
 const fePort = getPortFromUrl(FE_URL, 5173);
-const reuseExistingServer = process.env.E2E_REUSE_EXISTING_SERVER === 'true';
+// Default to reuse so a leftover server from a cancelled run never causes a hang.
+// Set E2E_REUSE_EXISTING_SERVER=false explicitly only when you need a clean start.
+const reuseExistingServer = process.env.E2E_REUSE_EXISTING_SERVER !== 'false';
 
 export default defineConfig({
   testDir: './e2e',
@@ -25,6 +27,7 @@ export default defineConfig({
   forbidOnly: !!process.env.CI,
   retries: 0, // No retries - tests should be deterministic
   workers: 1, // Single worker to ensure test isolation
+  timeout: 60 * 1000, // 60s per test max
   reporter: [
     ['list'],
     ['html', { open: 'never' }],

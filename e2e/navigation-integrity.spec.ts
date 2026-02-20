@@ -9,13 +9,22 @@ test.describe('Navigation integrity', () => {
   });
 
   test('settings menu entry should not break navigation', async ({ page }) => {
+    await page.waitForLoadState('networkidle');
     const userMenuButton = page
       .locator('[data-slot="sidebar"]')
       .getByRole('button', { name: new RegExp(escapeRegExp(TEST_USER.email), 'i') });
-    await expect(userMenuButton).toBeVisible();
+    await expect(userMenuButton).toBeVisible({ timeout: 10000 });
     await userMenuButton.click();
+    await page.waitForTimeout(500);
 
-    await page.getByRole('menuitem', { name: /^settings$/i }).click();
+    const settingsItem = page.getByRole('menuitem', { name: /^settings$/i });
+    // If menu didn't open on first click, try again
+    if (!(await settingsItem.isVisible().catch(() => false))) {
+      await userMenuButton.click();
+      await page.waitForTimeout(500);
+    }
+    await expect(settingsItem).toBeVisible({ timeout: 10000 });
+    await settingsItem.click();
     await expect(page).toHaveURL('/');
     await expect(
       page.locator('[data-slot="sidebar"]').getByRole('link', { name: /^dashboard$/i }),

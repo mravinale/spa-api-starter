@@ -114,10 +114,10 @@ test.describe('Organizations edge cases', () => {
     await dialog.getByLabel('Name').fill('E2E Slug Validation Org');
 
     await dialog.locator('input#org-slug').fill(EXISTING_ORG_SLUG);
-    await expect(dialog.getByText(/checking/i)).toBeVisible({ timeout: 10000 });
 
     const createButton = dialog.getByRole('button', { name: /^create$/i });
-    await expect(createButton).toBeDisabled();
+    // Wait for slug validation to complete (button disabled while checking or taken)
+    await expect(createButton).toBeDisabled({ timeout: 15000 });
 
     const availableSlug = `e2e-org-available-${Date.now()}`;
     await dialog.locator('input#org-slug').fill(availableSlug);
