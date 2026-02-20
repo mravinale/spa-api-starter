@@ -1,18 +1,21 @@
 import { test, expect, type Page } from '@playwright/test';
 
-import { API_BASE_URL, TEST_USER } from './env';
+import { TEST_USER } from './env';
 import {
-  ensureUserWithRole,
   escapeRegExp,
+  ensureUserRecord,
   loginWithCredentials,
-  uniqueEmail,
   withDatabase,
 } from './test-helpers';
+import { resendTestEmail } from '../src/shared/utils/resendTestEmail';
 
-const noSessionUserEmail = uniqueEmail('e2e-session-empty');
-const noSessionUserPassword = 'SessionPassword123!';
-const activeSessionUserEmail = uniqueEmail('e2e-session-active');
-const activeSessionUserPassword = 'SessionActivePassword123!';
+// Use stable emails so users persist across runs and can be found by name search
+const noSessionUserEmail = resendTestEmail('delivered', 'e2e-session-empty-stable');
+const activeSessionUserEmail = resendTestEmail('delivered', 'e2e-session-active-stable');
+
+// Sessions page searches by name (searchField: "name"), not email
+const noSessionSearchTerm = 'E2E No Sessions User';
+const activeSessionSearchTerm = 'E2E Active Sessions User';
 
 async function loginAsAdmin(page: Page) {
   await loginWithCredentials(page, TEST_USER.email, TEST_USER.password);
@@ -20,65 +23,58 @@ async function loginAsAdmin(page: Page) {
 
 async function openSessionsPage(page: Page) {
   await page.goto('/admin/sessions');
+  await page.waitForLoadState('networkidle');
   await expect(page.getByRole('heading', { name: /user sessions/i })).toBeVisible();
 }
 
 async function selectUser(page: Page, params: { searchTerm: string; expectedText: string }) {
-  await page.getByPlaceholder(/search users/i).fill(params.searchTerm);
+  const searchInput = page.getByPlaceholder(/search users/i);
+  await expect(searchInput).toBeVisible({ timeout: 10000 });
+  await expect(searchInput).toBeEnabled({ timeout: 5000 });
+  await searchInput.fill(params.searchTerm);
+  // Wait for the search results to update (React Query debounce + network)
+  await page.waitForTimeout(1500);
 
   const buttonsInList = page.locator('main button');
   const byExpectedText = buttonsInList.filter({
     hasText: new RegExp(escapeRegExp(params.expectedText), 'i'),
   });
-  const bySearchTerm = buttonsInList.filter({
-    hasText: new RegExp(escapeRegExp(params.searchTerm), 'i'),
-  });
 
-  if ((await byExpectedText.count()) > 0) {
-    await expect(byExpectedText.first()).toBeVisible({ timeout: 15000 });
-    await byExpectedText.first().click();
-    return;
-  }
-
-  await expect(bySearchTerm.first()).toBeVisible({ timeout: 15000 });
-  await bySearchTerm.first().click();
+  await expect(byExpectedText.first()).toBeVisible({ timeout: 15000 });
+  await byExpectedText.first().click();
 }
 
 test.describe('Sessions edge behavior', () => {
   test.beforeAll(async () => {
-    const userWithoutSessions = await ensureUserWithRole({
+    // Restore test user to admin in case a previous spec left it in another role
+    await withDatabase(async (pool) => {
+      await pool.query(`UPDATE "user" SET role = 'admin' WHERE email = $1`, [TEST_USER.email]);
+    });
+
+    // Use direct DB insert to guarantee users exist with correct names
+    const userWithoutSessions = await ensureUserRecord({
       email: noSessionUserEmail,
-      password: noSessionUserPassword,
       name: 'E2E No Sessions User',
       role: 'member',
     });
 
-    await ensureUserWithRole({
+    const activeUser = await ensureUserRecord({
       email: activeSessionUserEmail,
-      password: activeSessionUserPassword,
       name: 'E2E Active Sessions User',
       role: 'member',
     });
 
     await withDatabase(async (pool) => {
+      // Ensure no sessions for the no-session user
       await pool.query('DELETE FROM session WHERE "userId" = $1', [userWithoutSessions.id]);
-    });
-
-    const signInResponse = await fetch(`${API_BASE_URL}/api/auth/sign-in/email`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        email: activeSessionUserEmail,
-        password: activeSessionUserPassword,
-      }),
-    });
-
-    if (!signInResponse.ok) {
-      const errorText = await signInResponse.text().catch(() => '');
-      throw new Error(
-        `Failed to create active session test user session: status=${signInResponse.status} body=${errorText}`,
+      // Create a synthetic session for the active user so sessions page shows rows
+      await pool.query(
+        `INSERT INTO session (id, "userId", token, "expiresAt", "createdAt", "updatedAt", "ipAddress", "userAgent")
+         VALUES (gen_random_uuid()::text, $1, gen_random_uuid()::text, NOW() + INTERVAL '1 day', NOW(), NOW(), '127.0.0.1', 'E2E Test Browser')
+         ON CONFLICT DO NOTHING`,
+        [activeUser.id],
       );
-    }
+    });
   });
 
   test('should show no-user-selected state before choosing a user', async ({ page }) => {
@@ -93,8 +89,8 @@ test.describe('Sessions edge behavior', () => {
     await loginAsAdmin(page);
     await openSessionsPage(page);
     await selectUser(page, {
-      searchTerm: 'E2E No Sessions User',
-      expectedText: noSessionUserEmail,
+      searchTerm: noSessionSearchTerm,
+      expectedText: noSessionSearchTerm,
     });
 
     await expect(page.getByText(/no active sessions found for this user/i)).toBeVisible({ timeout: 15000 });
@@ -105,8 +101,8 @@ test.describe('Sessions edge behavior', () => {
     await loginAsAdmin(page);
     await openSessionsPage(page);
     await selectUser(page, {
-      searchTerm: 'E2E Active Sessions User',
-      expectedText: activeSessionUserEmail,
+      searchTerm: activeSessionSearchTerm,
+      expectedText: activeSessionSearchTerm,
     });
 
     const rows = page.locator('table tbody tr');

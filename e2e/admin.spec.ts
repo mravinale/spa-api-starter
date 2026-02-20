@@ -106,7 +106,9 @@ async function ensureAdminFixtures(): Promise<void> {
 
 // Helper to login
 async function login(page: import('@playwright/test').Page) {
+  await page.context().clearCookies();
   await page.goto('/login');
+  await page.evaluate(() => { localStorage.clear(); sessionStorage.clear(); });
   await page.getByLabel('Email').fill(TEST_USER.email);
   await page.getByLabel('Password').fill(TEST_USER.password);
   await page.getByRole('button', { name: /^login$/i }).click();

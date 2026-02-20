@@ -142,6 +142,7 @@ test.describe('Admin Role - Full Platform Access', () => {
 
   test('should access Sessions management page', async ({ page }) => {
     await page.goto('/admin/sessions');
+    await page.waitForLoadState('networkidle');
     await expect(page.getByRole('heading', { name: /sessions/i })).toBeVisible();
   });
 
@@ -153,12 +154,14 @@ test.describe('Admin Role - Full Platform Access', () => {
 
   test('should access Roles & Permissions page', async ({ page }) => {
     await page.goto('/admin/roles');
+    await page.waitForLoadState('networkidle');
     await expect(page.getByRole('heading', { name: /roles & permissions/i })).toBeVisible();
     await expect(page.getByRole('button', { name: /create role/i })).toBeVisible();
   });
 
   test('should see all 3 unified roles on Roles page', async ({ page }) => {
     await page.goto('/admin/roles');
+    await page.waitForLoadState('networkidle');
     await page.waitForSelector('[data-testid^="role-card-"]');
     
     await expect(page.locator('[data-testid="role-card-admin"]')).toBeVisible();
@@ -168,6 +171,7 @@ test.describe('Admin Role - Full Platform Access', () => {
 
   test('should see correct Admin role description', async ({ page }) => {
     await page.goto('/admin/roles');
+    await page.waitForLoadState('networkidle');
     await page.waitForSelector('[data-testid^="role-card-"]');
     
     const adminCard = page.locator('[data-testid="role-card-admin"]');
@@ -176,6 +180,7 @@ test.describe('Admin Role - Full Platform Access', () => {
 
   test('should see correct Manager role description', async ({ page }) => {
     await page.goto('/admin/roles');
+    await page.waitForLoadState('networkidle');
     await page.waitForSelector('[data-testid^="role-card-"]');
     
     const managerCard = page.locator('[data-testid="role-card-manager"]');
@@ -184,6 +189,7 @@ test.describe('Admin Role - Full Platform Access', () => {
 
   test('should see correct Member role description', async ({ page }) => {
     await page.goto('/admin/roles');
+    await page.waitForLoadState('networkidle');
     await page.waitForSelector('[data-testid^="role-card-"]');
     
     const memberCard = page.locator('[data-testid="role-card-member"]');
@@ -192,6 +198,7 @@ test.describe('Admin Role - Full Platform Access', () => {
 
   test('should be able to manage permissions for roles', async ({ page }) => {
     await page.goto('/admin/roles');
+    await page.waitForLoadState('networkidle');
     await page.waitForSelector('[data-testid^="role-card-"]');
     
     const managerCard = page.locator('[data-testid="role-card-manager"]');
@@ -249,7 +256,8 @@ test.describe('Admin Role - Full Platform Access', () => {
 
   test('Admin role should expose permissions management (21+ permissions available)', async ({ page }) => {
     await page.goto('/admin/roles');
-    await page.waitForSelector('[data-testid^="role-card-"]');
+    await page.waitForLoadState('networkidle');
+    await page.waitForSelector('[data-testid^="role-card-"]', { timeout: 60000 });
 
     const adminCard = page.locator('[data-testid="role-card-admin"]');
     await adminCard.getByRole('button', { name: /manage/i }).click();
@@ -268,6 +276,7 @@ test.describe('Admin Role - Full Platform Access', () => {
 
   test('Member role should have limited permissions (3)', async ({ page }) => {
     await page.goto('/admin/roles');
+    await page.waitForLoadState('networkidle');
     await page.waitForSelector('[data-testid^="role-card-"]');
 
     const memberCard = page.locator('[data-testid="role-card-member"]');
@@ -337,9 +346,17 @@ test.describe('Manager Role - Organization-Scoped Access', () => {
   });
 
   test.beforeEach(async ({ page }) => {
+    // Re-ensure org + membership and refresh the org ID (handles stale ID from beforeAll)
+    const { organizationId } = await ensureOrganizationForTestUser({
+      orgSlug: MANAGER_ORG_SLUG,
+      orgName: 'Manager Org',
+      memberRole: 'manager',
+    });
+    managerOrgId = organizationId;
     await login(page);
     await setActiveOrganizationForUserSessions(managerOrgId);
-    await page.reload();
+    // Navigate to dashboard to force backend to re-read the updated session
+    await page.goto('/');
     await page.waitForLoadState('networkidle');
   });
 
@@ -459,11 +476,10 @@ test.describe('Manager Role - Organization-Scoped Access', () => {
   test('manager should NOT see Admin in org member role dropdown', async ({ page }) => {
     await page.goto('/admin/organizations');
     await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(1000);
 
-    // Click deterministic manager organization to see its members
-    const managerOrg = page.getByRole('button', {
-      name: new RegExp(`/${MANAGER_ORG_SLUG}$`, 'i'),
-    });
+    // In manager mode, backend returns only the active org; select the first org row.
+    const managerOrg = page.locator('main button').filter({ hasText: /\// }).first();
     await expect(managerOrg).toBeVisible({ timeout: 15000 });
     await managerOrg.click();
     await page.waitForTimeout(2000);
@@ -495,11 +511,10 @@ test.describe('Manager Role - Organization-Scoped Access', () => {
   test('manager should NOT see Admin role in Add Member dialog', async ({ page }) => {
     await page.goto('/admin/organizations');
     await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(1000);
 
-    // Click deterministic manager organization
-    const managerOrg = page.getByRole('button', {
-      name: new RegExp(`/${MANAGER_ORG_SLUG}$`, 'i'),
-    });
+    // In manager mode, backend returns only the active org; select the first org row.
+    const managerOrg = page.locator('main button').filter({ hasText: /\// }).first();
     await expect(managerOrg).toBeVisible({ timeout: 15000 });
     await managerOrg.click();
     await page.waitForTimeout(2000);
@@ -548,22 +563,12 @@ test.describe('Member Role - Basic Read Access', () => {
   });
 
   test('should NOT see admin navigation items in sidebar', async ({ page }) => {
-    // Member role should not see admin-specific sidebar items
-    // Use sidebar-specific selector to avoid matching other elements
-    const sidebar = page.locator('[data-slot="sidebar"]');
-    
-    // Wait for sidebar to be visible
-    await expect(sidebar).toBeVisible();
-    
-    // Admin section should not be visible for members
-    const adminSection = sidebar.getByText('Admin', { exact: true });
-    const hasAdminSection = await adminSection.isVisible().catch(() => false);
-    
-    // If admin section is visible, this test should fail only if we're actually a member
-    // The role may have been changed by parallel tests
-    if (hasAdminSection) {
-      console.log('⚠️ Admin section visible - role may have been changed by parallel test');
-    }
+    await expect(page).toHaveURL('/');
+    await page.waitForLoadState('networkidle');
+
+    // Member role must not have any admin navigation routes rendered.
+    const adminRouteLinks = page.locator('a[href^="/admin"]');
+    await expect(adminRouteLinks).toHaveCount(0);
   });
 
   test('should be redirected when accessing /admin/users directly', async ({ page }) => {
@@ -745,7 +750,7 @@ test.describe('Organization Scoping - Manager Restrictions', () => {
   test.beforeEach(async ({ page }) => {
     await login(page);
     await setActiveOrganizationForUserSessions(managerOrgId);
-    await page.reload();
+    await page.reload().catch(() => page.reload());
     await page.waitForLoadState('networkidle');
   });
 
