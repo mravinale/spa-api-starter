@@ -48,10 +48,15 @@ async function openOrganizationBySlug(page: Page, slug: string) {
   await expect(searchInput).toBeVisible({ timeout: 10000 });
   await searchInput.fill(slug);
 
-  let orgButton = page.locator('main button').filter({ hasText: `/${slug}` }).first();
+  const orgButton = page.locator('main button').filter({ hasText: `/${slug}` }).first();
   const exactVisible = await orgButton.isVisible({ timeout: 5000 }).catch(() => false);
   if (!exactVisible) {
-    orgButton = page.locator('main button').filter({ hasText: /\// }).first();
+    const visibleOrgLabels = (await page.locator('main button').filter({ hasText: /\// }).allTextContents())
+      .map((label) => label.trim())
+      .filter(Boolean);
+    throw new Error(
+      `Could not find organization button for slug "${slug}" after search. Visible organization labels: ${visibleOrgLabels.join(', ') || '(none)'}`,
+    );
   }
 
   await expect(orgButton).toBeVisible({ timeout: 15000 });

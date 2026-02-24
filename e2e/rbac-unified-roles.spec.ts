@@ -179,7 +179,11 @@ async function signInAndGetAuthHeaders(request: APIRequestContext): Promise<Reco
   const signInData = await signInRes.json();
   const token = signInData.token || signInData.session?.token;
 
-  return token ? { Authorization: `Bearer ${token}` } : {};
+  if (!token) {
+    throw new Error('Authentication succeeded but no token was returned from sign-in response');
+  }
+
+  return { Authorization: `Bearer ${token}` };
 }
 
 async function findUserRowByEmail(page: Page, email: string): Promise<Locator> {

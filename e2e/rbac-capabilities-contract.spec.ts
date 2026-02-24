@@ -43,7 +43,6 @@ type CapabilitiesActions = {
   unban: boolean;
   setPassword: boolean;
   remove: boolean;
-  revokeSessions: boolean;
   impersonate: boolean;
 };
 
@@ -98,6 +97,9 @@ function getContractRows(
   permissions: Set<string>,
 ): Array<{ label: RegExp; allowed: boolean }> {
   const can = (permission: string) => permissions.has(permission);
+
+  // This contract only covers actions rendered in the Users table row menu.
+  // Session revocation is exercised on the Sessions view matrix tests.
 
   return [
     { label: /edit user/i, allowed: actions.update && can('user:update') },
