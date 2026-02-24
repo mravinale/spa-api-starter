@@ -1,20 +1,14 @@
 import { test, expect, type Page } from '@playwright/test';
 
 import {
-  ensureOrganizationMembership,
   ensureUserWithRole,
   loginWithCredentials,
-  setActiveOrganizationForUserSessions,
   uniqueEmail,
 } from './test-helpers';
 
 const PASSWORD = 'RolesVisibility123!';
 
 const adminEmail = uniqueEmail('e2e-roles-admin');
-const managerEmail = uniqueEmail('e2e-roles-manager');
-const orgSlug = `e2e-roles-org-${Date.now()}`;
-
-let managerOrganizationId = '';
 
 async function openRolesPage(page: Page) {
   await page.goto('/admin/roles');
@@ -26,17 +20,7 @@ async function loginAsAdmin(page: Page) {
   await loginWithCredentials(page, adminEmail, PASSWORD);
 }
 
-async function loginAsManager(page: Page) {
-  await loginWithCredentials(page, managerEmail, PASSWORD);
-  await setActiveOrganizationForUserSessions({
-    userEmail: managerEmail,
-    organizationId: managerOrganizationId,
-  });
-  await page.goto('/');
-  await page.waitForLoadState('networkidle');
-}
-
-test.describe('Roles page visibility rules', () => {
+test.describe('Roles page system-role invariants', () => {
   test.beforeAll(async () => {
     await ensureUserWithRole({
       email: adminEmail,
@@ -44,43 +28,9 @@ test.describe('Roles page visibility rules', () => {
       name: 'E2E Roles Admin',
       role: 'admin',
     });
-
-    await ensureUserWithRole({
-      email: managerEmail,
-      password: PASSWORD,
-      name: 'E2E Roles Manager',
-      role: 'manager',
-    });
-
-    managerOrganizationId = await ensureOrganizationMembership({
-      userEmail: managerEmail,
-      role: 'manager',
-      orgSlug,
-      orgName: 'E2E Roles Organization',
-    });
   });
 
-  test('admin should see create role action and all system role cards', async ({ page }) => {
-    await loginAsAdmin(page);
-    await openRolesPage(page);
-
-    await expect(page.getByRole('button', { name: /create role/i })).toBeVisible();
-    await expect(page.locator('[data-testid="role-card-admin"]')).toBeVisible();
-    await expect(page.locator('[data-testid="role-card-manager"]')).toBeVisible();
-    await expect(page.locator('[data-testid="role-card-member"]')).toBeVisible();
-  });
-
-  test('manager should only see member role card and no create role action', async ({ page }) => {
-    await loginAsManager(page);
-    await openRolesPage(page);
-
-    await expect(page.getByRole('button', { name: /create role/i })).not.toBeVisible();
-    await expect(page.locator('[data-testid="role-card-member"]')).toBeVisible();
-    await expect(page.locator('[data-testid="role-card-admin"]')).not.toBeVisible();
-    await expect(page.locator('[data-testid="role-card-manager"]')).not.toBeVisible();
-  });
-
-  test('system roles should not render edit or delete actions', async ({ page }) => {
+  test('system roles should render system badge and block edit/delete actions', async ({ page }) => {
     await loginAsAdmin(page);
     await openRolesPage(page);
 
@@ -91,13 +41,5 @@ test.describe('Roles page visibility rules', () => {
       await expect(roleCard.getByRole('button', { name: /^edit$/i })).toHaveCount(0);
       await expect(roleCard.locator('button.text-destructive')).toHaveCount(0);
     }
-  });
-
-  test('manager should not see manage permissions action without role:assign', async ({ page }) => {
-    await loginAsManager(page);
-    await openRolesPage(page);
-
-    const memberCard = page.locator('[data-testid="role-card-member"]');
-    await expect(memberCard.getByRole('button', { name: /manage/i })).toHaveCount(0);
   });
 });

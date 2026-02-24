@@ -1,4 +1,4 @@
-import { test, expect, Page } from '@playwright/test';
+import { test, expect, type APIRequestContext, type Locator, Page } from '@playwright/test';
 import { Pool } from 'pg';
 import { DATABASE_URL, API_BASE_URL, TEST_USER } from './env';
 import { resendTestEmail } from '../src/shared/utils/resendTestEmail';
@@ -101,6 +101,64 @@ async function ensureMemberUser(emailPrefix: string) {
   });
 }
 
+async function ensureMemberUserInOrganization(emailPrefix: string, organizationId: string) {
+  const { userId, email } = await ensureMemberUser(emailPrefix);
+
+  await withDatabase(async (pool) => {
+    await pool.query(
+      `INSERT INTO member (id, "organizationId", "userId", role, "createdAt")
+       SELECT gen_random_uuid()::text, $1, $2, 'member', NOW()
+       WHERE NOT EXISTS (
+         SELECT 1 FROM member WHERE "organizationId" = $1 AND "userId" = $2
+       )`,
+      [organizationId, userId],
+    );
+  });
+
+  return { userId, email };
+}
+
+async function ensureUserInOrganization(params: {
+  emailPrefix: string;
+  userRole: 'admin' | 'manager' | 'member';
+  organizationId: string;
+  memberRole: 'owner' | 'manager' | 'member';
+}) {
+  return await withDatabase(async (pool) => {
+    const email = resendTestEmail('delivered', params.emailPrefix);
+
+    const userResult = await pool.query<{ id: string }>(
+      `INSERT INTO "user" (id, name, email, role, "emailVerified", "createdAt", "updatedAt")
+       VALUES (gen_random_uuid()::text, $1, $2, $3, true, NOW(), NOW())
+       ON CONFLICT (email) DO UPDATE
+         SET role = EXCLUDED.role,
+             "emailVerified" = true,
+             "updatedAt" = NOW()
+       RETURNING id`,
+      [`${params.userRole} ${params.emailPrefix}`, email, params.userRole],
+    );
+
+    const userId = userResult.rows[0].id;
+
+    await pool.query(
+      `INSERT INTO member (id, "organizationId", "userId", role, "createdAt")
+       SELECT gen_random_uuid()::text, $1, $2, $3, NOW()
+       WHERE NOT EXISTS (
+         SELECT 1 FROM member WHERE "organizationId" = $1 AND "userId" = $2
+       )`,
+      [params.organizationId, userId, params.memberRole],
+    );
+
+    await pool.query(
+      `UPDATE member SET role = $3
+       WHERE "organizationId" = $1 AND "userId" = $2`,
+      [params.organizationId, userId, params.memberRole],
+    );
+
+    return { userId, email };
+  });
+}
+
 // Login helper
 async function login(page: Page) {
   await page.context().clearCookies();
@@ -110,6 +168,36 @@ async function login(page: Page) {
   await page.getByRole('button', { name: /^login$/i }).click();
   await expect(page).toHaveURL('/', { timeout: 15000 });
   await page.waitForLoadState('networkidle');
+}
+
+async function signInAndGetAuthHeaders(request: APIRequestContext): Promise<Record<string, string>> {
+  const signInRes = await request.post(`${API_BASE_URL}/api/auth/sign-in/email`, {
+    data: { email: TEST_USER.email, password: TEST_USER.password },
+  });
+
+  expect(signInRes.status()).toBe(200);
+  const signInData = await signInRes.json();
+  const token = signInData.token || signInData.session?.token;
+
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+async function findUserRowByEmail(page: Page, email: string): Promise<Locator> {
+  const searchInput = page.getByPlaceholder(/search users/i);
+  await expect(searchInput).toBeVisible({ timeout: 10000 });
+  await searchInput.fill(email);
+  await page.waitForTimeout(800);
+
+  const targetRow = page.locator('table tbody tr', { hasText: email }).first();
+  await expect(targetRow).toBeVisible({ timeout: 15000 });
+  return targetRow;
+}
+
+async function openActionsMenuForUserEmail(page: Page, email: string): Promise<void> {
+  const row = await findUserRowByEmail(page, email);
+  const actionBtn = row.getByRole('button');
+  await expect(actionBtn).toBeVisible();
+  await actionBtn.click();
 }
 
 test.describe.serial('Unified Role Model - Serial', () => {
@@ -162,46 +250,45 @@ test.describe('Admin Role - Full Platform Access', () => {
   test('should see all 3 unified roles on Roles page', async ({ page }) => {
     await page.goto('/admin/roles');
     await page.waitForLoadState('networkidle');
-    await page.waitForSelector('[data-testid^="role-card-"]');
-    
-    await expect(page.locator('[data-testid="role-card-admin"]')).toBeVisible();
-    await expect(page.locator('[data-testid="role-card-manager"]')).toBeVisible();
-    await expect(page.locator('[data-testid="role-card-member"]')).toBeVisible();
+
+    await expect(page.locator('[data-testid="role-card-admin"]')).toBeVisible({ timeout: 15000 });
+    await expect(page.locator('[data-testid="role-card-manager"]')).toBeVisible({ timeout: 15000 });
+    await expect(page.locator('[data-testid="role-card-member"]')).toBeVisible({ timeout: 15000 });
   });
 
   test('should see correct Admin role description', async ({ page }) => {
     await page.goto('/admin/roles');
     await page.waitForLoadState('networkidle');
-    await page.waitForSelector('[data-testid^="role-card-"]');
-    
+
     const adminCard = page.locator('[data-testid="role-card-admin"]');
-    await expect(adminCard.getByText(/global platform administrator/i)).toBeVisible();
+    await expect(adminCard).toBeVisible({ timeout: 15000 });
+    await expect(adminCard.getByText(/global platform administrator/i)).toBeVisible({ timeout: 15000 });
   });
 
   test('should see correct Manager role description', async ({ page }) => {
     await page.goto('/admin/roles');
     await page.waitForLoadState('networkidle');
-    await page.waitForSelector('[data-testid^="role-card-"]');
-    
+
     const managerCard = page.locator('[data-testid="role-card-manager"]');
-    await expect(managerCard.getByText(/organization manager/i)).toBeVisible();
+    await expect(managerCard).toBeVisible({ timeout: 15000 });
+    await expect(managerCard.getByText(/organization manager/i)).toBeVisible({ timeout: 15000 });
   });
 
   test('should see correct Member role description', async ({ page }) => {
     await page.goto('/admin/roles');
     await page.waitForLoadState('networkidle');
-    await page.waitForSelector('[data-testid^="role-card-"]');
-    
+
     const memberCard = page.locator('[data-testid="role-card-member"]');
-    await expect(memberCard.getByText(/organization member/i)).toBeVisible();
+    await expect(memberCard).toBeVisible({ timeout: 15000 });
+    await expect(memberCard.getByText(/organization member/i)).toBeVisible({ timeout: 15000 });
   });
 
   test('should be able to manage permissions for roles', async ({ page }) => {
     await page.goto('/admin/roles');
     await page.waitForLoadState('networkidle');
-    await page.waitForSelector('[data-testid^="role-card-"]');
-    
+
     const managerCard = page.locator('[data-testid="role-card-manager"]');
+    await expect(managerCard).toBeVisible({ timeout: 15000 });
     await managerCard.getByRole('button', { name: /manage/i }).click();
     
     await expect(page.getByRole('dialog')).toBeVisible();
@@ -393,75 +480,52 @@ test.describe('Manager Role - Organization-Scoped Access', () => {
 
   test('manager should see self actions constrained by permissions', async ({ page }) => {
     await page.goto('/admin/users');
-    await page.waitForSelector('table tbody tr', { timeout: 15000 });
 
-    const rows = page.locator('table tbody tr');
-    const rowCount = await rows.count();
-
-    for (let i = 0; i < rowCount; i++) {
-      const row = rows.nth(i);
-      const cellText = await row.locator('td').first().textContent();
-      if (cellText && cellText.includes(TEST_USER.email.split('@')[0])) {
-        const actionBtn = row.getByRole('button');
-        if (await actionBtn.isVisible({ timeout: 1000 }).catch(() => false)) {
-          await actionBtn.click();
-          await expect(page.getByRole('menuitem', { name: /edit user/i })).toBeVisible();
-          await expect(page.getByRole('menuitem', { name: /impersonate/i })).not.toBeVisible();
-          await expect(page.getByRole('menuitem', { name: /change role/i })).not.toBeVisible();
-          await page.keyboard.press('Escape');
-        }
-        break;
-      }
-    }
+    await openActionsMenuForUserEmail(page, TEST_USER.email);
+    await expect(page.getByRole('menuitem', { name: /edit user/i })).toBeVisible();
+    await expect(page.getByRole('menuitem', { name: /reset password/i })).not.toBeVisible();
+    await expect(page.getByRole('menuitem', { name: /impersonate/i })).not.toBeVisible();
+    await expect(page.getByRole('menuitem', { name: /change role/i })).not.toBeVisible();
+    await page.keyboard.press('Escape');
   });
 
   test('manager should see member-user actions allowed by permissions', async ({ page }) => {
-    await ensureMemberUser('mgr-action-target');
+    const { email } = await ensureMemberUserInOrganization('mgr-action-target', managerOrgId);
     await page.goto('/admin/users');
-    await page.waitForSelector('table tbody tr', { timeout: 15000 });
 
-    const rows = page.locator('table tbody tr');
-    const rowCount = await rows.count();
+    await openActionsMenuForUserEmail(page, email);
 
-    for (let i = 0; i < rowCount; i++) {
-      const row = rows.nth(i);
-      const roleCell = await row.locator('td').nth(2).textContent();
-      if (roleCell && roleCell.includes('member')) {
-        const actionBtn = row.getByRole('button');
-        if (await actionBtn.isVisible({ timeout: 1000 }).catch(() => false)) {
-          await actionBtn.click();
-          await expect(page.getByRole('menuitem', { name: /edit user/i })).toBeVisible();
+    // Matrix-aligned manager-on-member expectations.
+    await expect(page.getByRole('menuitem', { name: /edit user/i })).toBeVisible();
+    await expect(page.getByRole('menuitem', { name: /change role/i })).not.toBeVisible();
+    await expect(page.getByRole('menuitem', { name: /reset password/i })).not.toBeVisible();
+    await expect(page.getByRole('menuitem', { name: /impersonate/i })).not.toBeVisible();
+    await expect(page.getByRole('menuitem', { name: /ban user|unban user/i })).toBeVisible();
 
-          const privilegedItems = page.getByRole('menuitem', {
-            name: /change role|reset password|impersonate user|ban user|unban user/i,
-          });
-          await expect(privilegedItems.first()).toBeVisible();
-
-          await page.keyboard.press('Escape');
-        }
-        break;
-      }
-    }
+    await page.keyboard.press('Escape');
   });
 
   test('manager should NOT see actions on admin users', async ({ page }) => {
+    const adminTarget = await ensureUserInOrganization({
+      emailPrefix: `mgr-no-actions-admin-${Date.now()}`,
+      userRole: 'admin',
+      organizationId: managerOrgId,
+      memberRole: 'owner',
+    });
+    const managerTarget = await ensureUserInOrganization({
+      emailPrefix: `mgr-no-actions-manager-${Date.now()}`,
+      userRole: 'manager',
+      organizationId: managerOrgId,
+      memberRole: 'manager',
+    });
+
     await page.goto('/admin/users');
-    await page.waitForSelector('table tbody tr', { timeout: 15000 });
 
-    const rows = page.locator('table tbody tr');
-    const rowCount = await rows.count();
+    const adminRow = await findUserRowByEmail(page, adminTarget.email);
+    await expect(adminRow.getByRole('button')).toHaveCount(0);
 
-    for (let i = 0; i < rowCount; i++) {
-      const row = rows.nth(i);
-      const roleCell = await row.locator('td').nth(2).textContent();
-      const cellText = await row.locator('td').first().textContent();
-      if (roleCell && roleCell.includes('admin') && cellText && !cellText.includes(TEST_USER.email.split('@')[0])) {
-        const actionBtns = row.getByRole('button');
-        const btnCount = await actionBtns.count();
-        expect(btnCount).toBe(0);
-        break;
-      }
-    }
+    const managerRow = await findUserRowByEmail(page, managerTarget.email);
+    await expect(managerRow.getByRole('button')).toHaveCount(0);
   });
 
   test('manager should see organization switcher in sidebar', async ({ page }) => {
@@ -573,14 +637,10 @@ test.describe('Member Role - Basic Read Access', () => {
 
   test('should be redirected when accessing /admin/users directly', async ({ page }) => {
     await page.goto('/admin/users');
-    // Either redirected or page shows access denied
-    await page.waitForTimeout(2000);
-    const url = page.url();
-    const hasAccess = url.includes('/admin/users') && await page.getByRole('heading', { name: /users/i }).isVisible().catch(() => false);
-    // Member should not have access, but parallel tests may have changed role
-    if (hasAccess) {
-      console.log('⚠️ Has access to admin/users - role may have been changed by parallel test');
-    }
+    await expect(page).toHaveURL('/');
+    await expect(
+      page.locator('[data-slot="sidebar"]').getByRole('link', { name: /^dashboard$/i }),
+    ).toBeVisible();
   });
 });
 
@@ -640,6 +700,30 @@ test.describe('API Permission Restrictions', () => {
       data: { userId: 'target-user-id' },
     });
     expect([401, 403]).toContain(response.status());
+  });
+
+  test('should forbid role creation for authenticated manager', async ({ request }) => {
+    await setUserRole('manager');
+    const headers = await signInAndGetAuthHeaders(request);
+
+    const response = await request.post(`${API_BASE_URL}/api/rbac/roles`, {
+      headers,
+      data: { name: `mgr-blocked-${Date.now()}`, displayName: 'Manager Blocked Role' },
+    });
+
+    expect(response.status()).toBe(403);
+  });
+
+  test('should forbid role creation for authenticated member', async ({ request }) => {
+    await setUserRole('member');
+    const headers = await signInAndGetAuthHeaders(request);
+
+    const response = await request.post(`${API_BASE_URL}/api/rbac/roles`, {
+      headers,
+      data: { name: `member-blocked-${Date.now()}`, displayName: 'Member Blocked Role' },
+    });
+
+    expect(response.status()).toBe(403);
   });
 });
 
