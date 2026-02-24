@@ -106,7 +106,7 @@ test.describe.serial('Users page permissions matrix', () => {
 
     await ensureOrganizationMembership({
       userEmail: adminTargetEmail,
-      role: 'owner',
+      role: 'admin',
       orgSlug,
       orgName: 'E2E Matrix Organization',
     });

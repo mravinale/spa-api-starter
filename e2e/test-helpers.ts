@@ -131,7 +131,7 @@ export async function loginWithCredentials(page: Page, email: string, password: 
 
 export async function ensureOrganizationMembership(params: {
   userEmail: string;
-  role: 'manager' | 'member' | 'owner';
+  role: 'admin' | 'manager' | 'member';
   orgSlug: string;
   orgName: string;
 }): Promise<string> {
