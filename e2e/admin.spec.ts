@@ -497,31 +497,10 @@ test.describe('Admin Panel E2E Tests', () => {
       await loginAsAdmin(page, '/admin/roles');
     });
 
-    test('should display roles page', async ({ page }) => {
+    test('should display roles page shell', async ({ page }) => {
+      // RBAC visibility and role-card matrix assertions are covered by rbac-*-matrix specs.
       await expect(page).toHaveURL('/admin/roles');
       await expect(page.getByRole('heading', { name: /roles/i })).toBeVisible();
-    });
-
-    test('should show all available roles', async ({ page }) => {
-      // Wait for roles to load from API
-      await page.waitForSelector('[data-testid^="role-card-"]');
-      
-      // Check that unified roles are displayed (admin, manager, member)
-      await expect(page.locator('[data-testid="role-card-admin"]')).toBeVisible();
-      await expect(page.locator('[data-testid="role-card-manager"]')).toBeVisible();
-      await expect(page.locator('[data-testid="role-card-member"]')).toBeVisible();
-    });
-
-    test('should show role descriptions', async ({ page }) => {
-      await page.waitForSelector('[data-testid^="role-card-"]');
-      // Unified role model descriptions
-      await expect(page.getByText(/global platform administrator/i)).toBeVisible();
-      await expect(page.getByText(/organization manager/i)).toBeVisible();
-      await expect(page.getByText(/organization member/i)).toBeVisible();
-    });
-
-    test('should show Create Role button', async ({ page }) => {
-      await expect(page.getByRole('button', { name: /create role/i })).toBeVisible();
     });
 
     test('should open create role dialog', async ({ page }) => {
@@ -531,12 +510,6 @@ test.describe('Admin Panel E2E Tests', () => {
       // Check for form fields using more specific selectors
       await expect(page.getByRole('textbox', { name: /name \(identifier\)/i })).toBeVisible();
       await expect(page.getByRole('textbox', { name: /display name/i })).toBeVisible();
-    });
-
-    test('should show manage permissions button on role cards', async ({ page }) => {
-      await page.waitForSelector('[data-testid^="role-card-"]');
-      const adminCard = page.locator('[data-testid="role-card-admin"]');
-      await expect(adminCard.getByRole('button', { name: /manage/i })).toBeVisible();
     });
 
     test('should allow changing user role from users page', async ({ page }) => {

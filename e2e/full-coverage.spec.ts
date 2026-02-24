@@ -552,13 +552,10 @@ test.describe.serial('Role Management - Full CRUD', () => {
     await page.waitForLoadState('networkidle');
   });
 
-  test('should display roles page with all unified roles', async ({ page }) => {
+  test('should display roles page shell', async ({ page }) => {
+    // RBAC role visibility and action-gating expectations are covered in rbac-*-matrix specs.
+    await expect(page).toHaveURL('/admin/roles');
     await expect(page.getByRole('heading', { name: /roles/i })).toBeVisible();
-    await page.waitForSelector('[data-testid^="role-card-"]');
-    
-    await expect(page.locator('[data-testid="role-card-admin"]')).toBeVisible();
-    await expect(page.locator('[data-testid="role-card-manager"]')).toBeVisible();
-    await expect(page.locator('[data-testid="role-card-member"]')).toBeVisible();
   });
 
   test('should create a new custom role', async ({ page }) => {
