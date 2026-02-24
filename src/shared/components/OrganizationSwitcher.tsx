@@ -31,6 +31,7 @@ import { Skeleton } from "@/shared/components/ui/skeleton"
 
 import { organization } from "@/shared/lib/auth-client"
 import { usePermissionsContext } from "@/shared/context/PermissionsContext"
+import { useAuth } from "@/shared/context/AuthContext"
 import { organizationService } from "@/features/Admin/services/adminService"
 
 interface Organization {
@@ -42,6 +43,7 @@ interface Organization {
 
 export function OrganizationSwitcher() {
   const { can } = usePermissionsContext()
+  const { isAdmin } = useAuth()
   const [createDialogOpen, setCreateDialogOpen] = useState(false)
   const [newOrgData, setNewOrgData] = useState({ name: "", slug: "" })
   const [organizations, setOrganizations] = useState<Organization[]>([])
@@ -156,6 +158,19 @@ export function OrganizationSwitcher() {
 
   if (orgsLoading) {
     return <Skeleton className="h-9 w-40" />
+  }
+
+  if (!isAdmin) {
+    return (
+      <Button variant="outline" className="w-full justify-between" disabled>
+        <div className="flex items-center gap-2">
+          <IconBuilding className="h-4 w-4" />
+          <span className="truncate max-w-[120px]">
+            {activeOrg?.name ?? "Organization"}
+          </span>
+        </div>
+      </Button>
+    )
   }
 
   return (
