@@ -532,13 +532,20 @@ test.describe('Manager Role - Organization-Scoped Access', () => {
     await expect(managerRow.getByRole('button')).toHaveCount(0);
   });
 
-  test('manager should see organization switcher in sidebar', async ({ page }) => {
+  test('manager should see read-only organization control in sidebar', async ({ page }) => {
     await page.waitForTimeout(3000);
     const sidebar = page.locator('[data-slot="sidebar"]');
     await expect(sidebar).toBeVisible();
-    const orgButton = sidebar.getByText(/organization/i).or(sidebar.getByText(/Manager/i));
-    const visible = await orgButton.first().isVisible().catch(() => false);
-    expect(visible || true).toBeTruthy();
+
+    const orgLabel = sidebar.getByText(/^organization$/i);
+    await expect(orgLabel).toBeVisible();
+
+    const orgGroup = orgLabel.locator('xpath=ancestor::*[@data-slot="sidebar-group"][1]');
+    const orgControl = orgGroup.getByRole('button').first();
+
+    await expect(orgControl).toBeVisible();
+    await expect(orgControl).toBeDisabled();
+    await expect(orgControl).toContainText(/manager org|organization/i);
   });
 
   test('manager should NOT see Admin in org member role dropdown', async ({ page }) => {
