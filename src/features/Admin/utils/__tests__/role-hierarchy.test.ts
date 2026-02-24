@@ -3,10 +3,9 @@ import { ROLE_HIERARCHY, getRoleLevel, filterAssignableRoles } from '../role-hie
 
 describe('Role Hierarchy Utilities', () => {
   describe('ROLE_HIERARCHY', () => {
-    it('should have member < manager < admin < owner', () => {
+    it('should have member < manager < admin', () => {
       expect(ROLE_HIERARCHY.member).toBeLessThan(ROLE_HIERARCHY.manager);
       expect(ROLE_HIERARCHY.manager).toBeLessThan(ROLE_HIERARCHY.admin);
-      expect(ROLE_HIERARCHY.admin).toBeLessThan(ROLE_HIERARCHY.owner);
     });
   });
 
@@ -15,7 +14,6 @@ describe('Role Hierarchy Utilities', () => {
       expect(getRoleLevel('member')).toBe(0);
       expect(getRoleLevel('manager')).toBe(1);
       expect(getRoleLevel('admin')).toBe(2);
-      expect(getRoleLevel('owner')).toBe(3);
     });
 
     it('should return 0 for unknown roles', () => {
@@ -39,9 +37,12 @@ describe('Role Hierarchy Utilities', () => {
       expect(filterAssignableRoles(allRoles, 'member')).toEqual(['member']);
     });
 
-    it('owner should assign all roles including admin', () => {
-      const rolesWithOwner = ['owner', 'admin', 'manager', 'member'];
-      expect(filterAssignableRoles(rolesWithOwner, 'owner')).toEqual(rolesWithOwner);
+    it('should ignore unknown role names from input', () => {
+      expect(filterAssignableRoles(['super-admin', 'admin', 'manager', 'member'], 'admin')).toEqual([
+        'admin',
+        'manager',
+        'member',
+      ]);
     });
 
     it('unknown role should only assign member-level roles', () => {
