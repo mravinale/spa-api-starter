@@ -11,7 +11,7 @@ interface OrgManagerRouteProps {
 
 /**
  * Route guard that only allows access to users with org manager roles.
- * Requires the user to be authenticated and have a manager role (owner/admin/manager)
+ * Requires the user to be authenticated and have a manager role (admin/manager)
  * in the active organization.
  * 
  * @param memberRole - The user's role in the current organization (passed from parent)

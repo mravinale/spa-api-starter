@@ -513,8 +513,8 @@ export function OrganizationsPage() {
                               </td>
                               <td className="p-3">
                                 {(() => {
-                                  const isOwner = member.role === "owner"
-                                  const isOnlyOwner = isOwner && members.filter(m => m.role === "owner").length === 1
+                                  const isAdmin = member.role === "admin"
+                                  const isOnlyAdmin = isAdmin && members.filter(m => m.role === "admin").length === 1
                                   // Build role options: include current role even if not in assignableRoles
                                   const rawAssignable = orgRolesMeta?.assignableRoles ?? []
                                   const assignable = filterAssignableRoles(rawAssignable, user?.role ?? 'member')
@@ -529,7 +529,7 @@ export function OrganizationsPage() {
                                           handleUpdateRole(member.id, value)
                                         }
                                       }}
-                                      disabled={isOnlyOwner || !canInvite}
+                                      disabled={isOnlyAdmin || !canInvite}
                                     >
                                       <SelectTrigger className="w-32">
                                         <SelectValue placeholder="Select role" />

@@ -35,7 +35,7 @@ async function ensureOrganization(slug: string, name: string): Promise<void> {
 
     await pool.query(
       `INSERT INTO member (id, "organizationId", "userId", role, "createdAt")
-       VALUES (gen_random_uuid()::text, $1, $2, 'owner', NOW())
+       VALUES (gen_random_uuid()::text, $1, $2, 'admin', NOW())
        ON CONFLICT DO NOTHING`,
       [organizationId, userId],
     );
