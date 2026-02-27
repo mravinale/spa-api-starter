@@ -46,19 +46,16 @@ async function openOrganizationsPage(page: Page) {
 async function openOrganizationBySlug(page: Page, slug: string) {
   const searchInput = page.getByPlaceholder(/search organizations/i);
   await expect(searchInput).toBeVisible({ timeout: 10000 });
+
+  // Clear first to avoid stale state, then fill and wait for network to settle
+  await searchInput.clear();
   await searchInput.fill(slug);
+  await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {
+    // networkidle may not fire on all environments; continue regardless
+  });
 
+  // Use expect() so Playwright retries until the button appears in the filtered results
   const orgButton = page.locator('main button').filter({ hasText: `/${slug}` }).first();
-  const exactVisible = await orgButton.isVisible({ timeout: 5000 }).catch(() => false);
-  if (!exactVisible) {
-    const visibleOrgLabels = (await page.locator('main button').filter({ hasText: /\// }).allTextContents())
-      .map((label) => label.trim())
-      .filter(Boolean);
-    throw new Error(
-      `Could not find organization button for slug "${slug}" after search. Visible organization labels: ${visibleOrgLabels.join(', ') || '(none)'}`,
-    );
-  }
-
   await expect(orgButton).toBeVisible({ timeout: 15000 });
   await orgButton.click({ force: true });
 
