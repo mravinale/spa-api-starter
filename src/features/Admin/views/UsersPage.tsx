@@ -1,5 +1,4 @@
 import { useState, useMemo } from "react"
-import { useQueries } from "@tanstack/react-query"
 import { type ColumnDef } from "@tanstack/react-table"
 import {
   IconDotsVertical,
@@ -45,6 +44,7 @@ import {
 
 import {
   useUsers,
+  useUserCapabilitiesBatch,
   useCreateUser,
   useUpdateUser,
   useBanUser,
@@ -54,7 +54,6 @@ import {
   useRemoveUser,
   useRemoveUsers,
   useImpersonateUser,
-  userKeys,
 } from "../hooks/useUsers"
 import { Checkbox } from "@/shared/components/ui/checkbox"
 import { useAuth } from "@/shared/context/AuthContext"
@@ -156,27 +155,19 @@ export function UsersPage() {
   const { data, isLoading } = useUsers(queryParams)
   const users = data?.data ?? []
 
-  const capabilityQueries = useQueries({
-    queries: users.map((user) => ({
-      queryKey: userKeys.capabilities(user.id),
-      queryFn: () => adminService.getUserCapabilities(user.id),
-      enabled: !!currentUser,
-      staleTime: 60_000,
-    })),
-  })
+  const userIds = useMemo(() => users.map((u) => u.id), [users])
+  const { data: batchCapabilities } = useUserCapabilitiesBatch(userIds, !!currentUser)
 
   const capabilitiesByUserId = useMemo<Record<string, UserCapabilities["actions"]>>(() => {
-    const entries: Array<[string, UserCapabilities["actions"]]> = users.map((user, index) => {
-      const queryResult = capabilityQueries[index]
-      const isSelf = user.id === currentUser?.id
-      const targetRole = user.role || "member"
-      const fallbackActions = getFallbackUserActions(currentUser?.role || "member", targetRole, isSelf)
-
-      return [user.id, queryResult?.data?.actions ?? fallbackActions]
-    })
-
-    return Object.fromEntries(entries)
-  }, [users, capabilityQueries, currentUser?.id, currentUser?.role])
+    return Object.fromEntries(
+      users.map((user) => {
+        const isSelf = user.id === currentUser?.id
+        const targetRole = user.role || "member"
+        const fallbackActions = getFallbackUserActions(currentUser?.role || "member", targetRole, isSelf)
+        return [user.id, batchCapabilities?.[user.id]?.actions ?? fallbackActions]
+      })
+    )
+  }, [users, batchCapabilities, currentUser?.id, currentUser?.role])
 
   const createUser = useCreateUser()
   const updateUser = useUpdateUser()

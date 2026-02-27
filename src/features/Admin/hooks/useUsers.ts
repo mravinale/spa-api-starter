@@ -18,6 +18,7 @@ export const userKeys = {
     detail: (id: string) => [...userKeys.details(), id] as const,
     sessions: (userId: string) => [...userKeys.all, "sessions", userId] as const,
     capabilities: (userId: string) => [...userKeys.all, "capabilities", userId] as const,
+    batchCapabilities: (userIds: string[]) => [...userKeys.all, "capabilities", "batch", userIds] as const,
 };
 
 /**
@@ -38,6 +39,19 @@ export function useUserCapabilities(userId: string) {
         queryKey: userKeys.capabilities(userId),
         queryFn: () => adminService.getUserCapabilities(userId),
         enabled: !!userId,
+    });
+}
+
+/**
+ * Hook to fetch backend-computed capabilities for a batch of users in a single request.
+ * Replaces N individual useUserCapabilities calls with one batch request.
+ */
+export function useUserCapabilitiesBatch(userIds: string[], enabled = true) {
+    return useQuery<Record<string, UserCapabilities>>({
+        queryKey: userKeys.batchCapabilities(userIds),
+        queryFn: () => adminService.getBatchCapabilities(userIds),
+        enabled: enabled && userIds.length > 0,
+        staleTime: 60_000,
     });
 }
 

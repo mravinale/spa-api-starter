@@ -13,6 +13,7 @@ import {
   useSetUserRole,
   useSetUserPassword,
   useUserCapabilities,
+  useUserCapabilitiesBatch,
   useUserSessions,
   useRevokeSession,
   useRevokeAllSessions,
@@ -34,6 +35,7 @@ vi.mock('../../services/adminService', () => ({
     unbanUser: vi.fn(),
     setRole: vi.fn(),
     getUserCapabilities: vi.fn(),
+    getBatchCapabilities: vi.fn(),
     setPassword: vi.fn(),
     listUserSessions: vi.fn(),
     revokeSession: vi.fn(),
@@ -51,6 +53,7 @@ const mockAdminService = adminService as unknown as {
   unbanUser: Mock
   setRole: Mock
   getUserCapabilities: Mock
+  getBatchCapabilities: Mock
 };
 
 // Create a wrapper with QueryClientProvider
@@ -252,6 +255,53 @@ describe('useUserCapabilities hook', () => {
 
     expect(mockAdminService.getUserCapabilities).toHaveBeenCalledWith('1');
     expect(result.current.data).toEqual(capabilities);
+  });
+});
+
+describe('useUserCapabilitiesBatch hook', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('returns empty data when userIds is empty (hook stays disabled)', () => {
+    const { result } = renderHook(() => useUserCapabilitiesBatch([]), {
+      wrapper: createWrapper(),
+    });
+
+    expect(result.current.isPending).toBe(true);
+    expect(mockAdminService.getBatchCapabilities).not.toHaveBeenCalled();
+  });
+
+  it('fetches batch capabilities and returns record keyed by userId', async () => {
+    const batchData: Record<string, object> = {
+      'user-1': {
+        targetUserId: 'user-1',
+        targetRole: 'member',
+        isSelf: false,
+        actions: { update: true, setRole: true, ban: true, unban: true, setPassword: true, remove: true, revokeSessions: true, impersonate: true },
+      },
+    };
+
+    mockAdminService.getBatchCapabilities.mockResolvedValue(batchData);
+
+    const { result } = renderHook(() => useUserCapabilitiesBatch(['user-1']), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => {
+      expect(result.current.isSuccess).toBe(true);
+    });
+
+    expect(mockAdminService.getBatchCapabilities).toHaveBeenCalledWith(['user-1']);
+    expect(result.current.data).toEqual(batchData);
+  });
+
+  it('does not call service when enabled=false', () => {
+    renderHook(() => useUserCapabilitiesBatch(['user-1'], false), {
+      wrapper: createWrapper(),
+    });
+
+    expect(mockAdminService.getBatchCapabilities).not.toHaveBeenCalled();
   });
 });
 
