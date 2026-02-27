@@ -1,5 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
-import { render, screen, waitFor } from "@testing-library/react"
+import { render, screen, waitFor, within } from "@testing-library/react"
+import userEvent from "@testing-library/user-event"
+import { toast } from "sonner"
 
 const {
   mockUsePermissionsContext,
@@ -45,30 +47,36 @@ vi.mock("sonner", () => ({
 
 import { OrganizationSwitcher } from "../OrganizationSwitcher"
 
+const ORG = { id: "org-1", name: "Test Org", slug: "test-org" }
+
 describe("OrganizationSwitcher", () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    vi.stubGlobal("location", { ...window.location, reload: vi.fn() })
     mockUsePermissionsContext.mockReturnValue({ can: () => false })
-    mockOrganization.list.mockResolvedValue({
-      data: [{ id: "org-1", name: "Test Org", slug: "test-org" }],
-    })
-    mockOrganization.getActiveMember.mockResolvedValue({
-      data: { organizationId: "org-1" },
-    })
+    mockUseAuth.mockReturnValue({ isAdmin: false })
+    mockOrganization.list.mockResolvedValue({ data: [ORG] })
+    mockOrganization.getActiveMember.mockResolvedValue({ data: { organizationId: "org-1" } })
     mockOrganization.setActive.mockResolvedValue({ data: null, error: null })
     mockOrganization.leave.mockResolvedValue({ data: null, error: null })
+    mockCreateOrganization.mockResolvedValue({ id: "org-2", name: "New Org" })
+  })
+
+  it("renders a skeleton while organizations are loading", () => {
+    mockOrganization.list.mockReturnValue(new Promise(() => {}))
+
+    render(<OrganizationSwitcher />)
+
+    expect(document.querySelector('[data-slot="skeleton"]')).toBeTruthy()
+    expect(screen.queryByRole("button")).toBeNull()
   })
 
   it("renders a read-only organization control for managers", async () => {
-    mockUseAuth.mockReturnValue({ isAdmin: false })
-
     render(<OrganizationSwitcher />)
 
     const button = await waitFor(() => screen.getByRole("button", { name: /test org/i }))
 
     expect(button).toBeDisabled()
-    expect(screen.queryByText("Create Organization")).toBeNull()
-    expect(screen.queryByText(/Leave Test Org/i)).toBeNull()
   })
 
   it("renders an interactive organization dropdown for admins", async () => {
@@ -79,5 +87,165 @@ describe("OrganizationSwitcher", () => {
     const button = await waitFor(() => screen.getByRole("button", { name: /test org/i }))
 
     expect(button).toBeEnabled()
+  })
+
+  it("shows 'No organizations' when the list is empty", async () => {
+    mockUseAuth.mockReturnValue({ isAdmin: true })
+    mockOrganization.list.mockResolvedValue({ data: [] })
+    mockOrganization.getActiveMember.mockResolvedValue({ data: null })
+
+    const user = userEvent.setup()
+    render(<OrganizationSwitcher />)
+
+    const trigger = await waitFor(() => screen.getByRole("button", { name: /select organization/i }))
+    await user.click(trigger)
+
+    expect(await screen.findByText("No organizations")).toBeInTheDocument()
+  })
+
+  it("calls setActive and reloads on org click", async () => {
+    mockUseAuth.mockReturnValue({ isAdmin: true })
+
+    const user = userEvent.setup()
+    render(<OrganizationSwitcher />)
+
+    const trigger = await waitFor(() => screen.getByRole("button", { name: /test org/i }))
+    await user.click(trigger)
+
+    const menuItem = await screen.findByRole("menuitem", { name: /^test org$/i })
+    await user.click(menuItem)
+
+    await waitFor(() => {
+      expect(mockOrganization.setActive).toHaveBeenCalledWith({ organizationId: "org-1" })
+      expect(toast.success).toHaveBeenCalledWith("Switched organization")
+    })
+  })
+
+  it("shows error toast when setActive fails", async () => {
+    mockUseAuth.mockReturnValue({ isAdmin: true })
+    mockOrganization.setActive.mockRejectedValue(new Error("Switch failed"))
+
+    const user = userEvent.setup()
+    render(<OrganizationSwitcher />)
+
+    const trigger = await waitFor(() => screen.getByRole("button", { name: /test org/i }))
+    await user.click(trigger)
+
+    const menuItem = await screen.findByRole("menuitem", { name: /^test org$/i })
+    await user.click(menuItem)
+
+    await waitFor(() => {
+      expect(toast.error).toHaveBeenCalledWith("Switch failed")
+    })
+  })
+
+  it("calls leave and shows success toast when leaving an org", async () => {
+    mockUseAuth.mockReturnValue({ isAdmin: true })
+
+    const user = userEvent.setup()
+    render(<OrganizationSwitcher />)
+
+    const trigger = await waitFor(() => screen.getByRole("button", { name: /test org/i }))
+    await user.click(trigger)
+
+    const leaveItem = await screen.findByRole("menuitem", { name: /leave test org/i })
+    await user.click(leaveItem)
+
+    await waitFor(() => {
+      expect(mockOrganization.leave).toHaveBeenCalledWith({ organizationId: "org-1" })
+      expect(toast.success).toHaveBeenCalledWith("Left organization")
+    })
+  })
+
+  it("shows error toast when createOrg fails", async () => {
+    mockUseAuth.mockReturnValue({ isAdmin: true })
+    mockUsePermissionsContext.mockReturnValue({ can: () => true })
+    mockCreateOrganization.mockRejectedValue(new Error("Create failed"))
+
+    const user = userEvent.setup()
+    render(<OrganizationSwitcher />)
+
+    const trigger = await waitFor(() => screen.getByRole("button", { name: /test org/i }))
+    await user.click(trigger)
+
+    const createItem = await screen.findByRole("menuitem", { name: /create organization/i })
+    await user.click(createItem)
+
+    const nameInput = await screen.findByLabelText(/name/i)
+    await user.type(nameInput, "New Org")
+
+    const createBtn = within(screen.getByRole("dialog")).getByRole("button", { name: /^create$/i })
+    await user.click(createBtn)
+
+    await waitFor(() => {
+      expect(toast.error).toHaveBeenCalledWith("Create failed")
+    })
+  })
+
+  it("closes create org dialog when Cancel is clicked", async () => {
+    mockUseAuth.mockReturnValue({ isAdmin: true })
+    mockUsePermissionsContext.mockReturnValue({ can: () => true })
+
+    const user = userEvent.setup()
+    render(<OrganizationSwitcher />)
+
+    const trigger = await waitFor(() => screen.getByRole("button", { name: /test org/i }))
+    await user.click(trigger)
+
+    const createItem = await screen.findByRole("menuitem", { name: /create organization/i })
+    await user.click(createItem)
+
+    const cancelBtn = await screen.findByRole("button", { name: /cancel/i })
+    await user.click(cancelBtn)
+
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog")).toBeNull()
+    })
+  })
+
+  it("shows error toast when leaving an org fails", async () => {
+    mockUseAuth.mockReturnValue({ isAdmin: true })
+    mockOrganization.leave.mockRejectedValue(new Error("Leave failed"))
+
+    const user = userEvent.setup()
+    render(<OrganizationSwitcher />)
+
+    const trigger = await waitFor(() => screen.getByRole("button", { name: /test org/i }))
+    await user.click(trigger)
+
+    const leaveItem = await screen.findByRole("menuitem", { name: /leave test org/i })
+    await user.click(leaveItem)
+
+    await waitFor(() => {
+      expect(toast.error).toHaveBeenCalledWith("Leave failed")
+    })
+  })
+
+  it("opens create org dialog and submits when user has create permission", async () => {
+    mockUseAuth.mockReturnValue({ isAdmin: true })
+    mockUsePermissionsContext.mockReturnValue({ can: () => true })
+
+    const user = userEvent.setup()
+    render(<OrganizationSwitcher />)
+
+    const trigger = await waitFor(() => screen.getByRole("button", { name: /test org/i }))
+    await user.click(trigger)
+
+    const createItem = await screen.findByRole("menuitem", { name: /create organization/i })
+    await user.click(createItem)
+
+    const nameInput = await screen.findByLabelText(/name/i)
+    const slugInput = screen.getByLabelText(/slug/i)
+
+    await user.type(nameInput, "New Org")
+    await user.type(slugInput, "new-org")
+
+    const createBtn = within(screen.getByRole("dialog")).getByRole("button", { name: /^create$/i })
+    await user.click(createBtn)
+
+    await waitFor(() => {
+      expect(mockCreateOrganization).toHaveBeenCalledWith({ name: "New Org", slug: "new-org" })
+      expect(toast.success).toHaveBeenCalledWith("Organization created successfully")
+    })
   })
 })

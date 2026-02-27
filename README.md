@@ -10,6 +10,7 @@ A production-ready **React SPA** with **Better Auth**, **RBAC**, **Admin Panel**
 - [Unified Role Model](#unified-role-model)
 - [Admin Panel](#admin-panel)
 - [Authentication](#authentication)
+- [Unit Testing](#unit-testing)
 - [E2E Testing](#e2e-testing)
 - [Development](#development)
 - [Companion Backend](#companion-backend)
@@ -25,7 +26,7 @@ A production-ready **React SPA** with **Better Auth**, **RBAC**, **Admin Panel**
 | **Admin Panel** | Users, Sessions, Organizations, Roles & Permissions management |
 | **Organizations** | Create orgs, invite members, manage roles, impersonation |
 | **UI** | Tailwind CSS, shadcn/ui, responsive sidebar, dark mode |
-| **Testing** | 123 Playwright E2E tests with full coverage |
+| **Testing** | 327 Vitest unit tests (≥70% coverage) + 123 Playwright E2E tests |
 
 ---
 
@@ -204,6 +205,77 @@ function MyComponent() {
 
 ---
 
+## Unit Testing
+
+### Stack
+
+- **[Vitest](https://vitest.dev/)** — fast unit test runner (jsdom environment)
+- **[React Testing Library](https://testing-library.com/)** — component rendering and interaction
+- **[@testing-library/user-event](https://testing-library.com/docs/user-event/intro/)** — realistic user interactions
+- **[v8 coverage](https://vitest.dev/guide/coverage)** — statement, branch, function, and line coverage
+
+### Running Tests
+
+```bash
+# Run all unit tests (with coverage report)
+npm test
+
+# Watch mode (re-runs on file changes)
+npm run test:watch
+
+# Run a specific file
+npm test -- --run src/features/Auth/views/__tests__/LoginPage.test.tsx
+```
+
+### Coverage Thresholds
+
+All files must meet **≥ 70%** for statements, branches, functions, and lines.
+
+```
+Statements : 96%   Branches : 89%   Functions : 92%   Lines : 98%
+```
+
+### Test File Conventions
+
+```
+src/
+├── features/
+│   └── Auth/
+│       ├── schemas/
+│       │   └── authSchemas.ts          # Zod validation schemas
+│       └── views/__tests__/
+│           └── LoginPage.test.tsx
+├── shared/
+│   ├── components/__tests__/
+│   │   └── OrganizationSwitcher.test.tsx
+│   └── components/ui/__tests__/
+│       ├── button.test.tsx
+│       ├── dialog.test.tsx
+│       ├── field.test.tsx
+│       └── theme-toggle.test.tsx
+└── features/Admin/services/__tests__/
+    ├── adminService.users.test.ts
+    ├── adminService.impersonation.test.ts
+    ├── adminService.organizationService.test.ts
+    └── rbacService.crud.test.ts
+```
+
+### Form Validation
+
+Forms use **[react-hook-form](https://react-hook-form.com/)** with **[Zod](https://zod.dev/)** schemas via `@hookform/resolvers`:
+
+```tsx
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { loginSchema } from "@/features/Auth/schemas/authSchemas";
+
+const { register, handleSubmit, formState: { errors } } = useForm({
+  resolver: zodResolver(loginSchema),
+});
+```
+
+---
+
 ## Authentication
 
 ### Auth Routes
@@ -353,7 +425,8 @@ npm run dev           # Start dev server
 npm run build         # Build for production
 npm run preview       # Preview production build
 npm run lint          # ESLint
-npm run test:e2e      # Run Playwright tests
+npm test              # Run Vitest unit tests with coverage
+npm run test:e2e      # Run Playwright E2E tests
 ```
 
 ### Adding Admin Features
@@ -419,6 +492,9 @@ VITE_API_URL=http://localhost:3000
 | TanStack Query | 5.x | Server state |
 | Tailwind CSS | 4.x | Styling |
 | shadcn/ui | - | UI components |
+| react-hook-form | 7.x | Form state management |
+| Zod | 3.x | Schema validation |
+| Vitest | 3.x | Unit testing |
 | Playwright | 1.x | E2E testing |
 
 ---

@@ -1,7 +1,10 @@
-import { useState, useEffect } from "react";
+import { useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { useAuth } from "@shared/context/AuthContext";
+import { loginSchema, type LoginFormValues } from "@features/Auth/schemas/authSchemas";
 import { Button } from "@/shared/components/ui/button";
 import {
     Card,
@@ -14,17 +17,26 @@ import { Input } from "@/shared/components/ui/input";
 import {
     Field,
     FieldDescription,
+    FieldError,
     FieldGroup,
     FieldLabel,
 } from "@/shared/components/ui/field";
 import { ThemeToggle } from "@/shared/components/ui/theme-toggle";
 
 export default function LoginPage() {
-    const [email, setEmail] = useState("");
-    const [password, setPassword] = useState("");
-    const [isLoading, setIsLoading] = useState(false);
     const { login, isAuthenticated } = useAuth();
     const navigate = useNavigate();
+    const {
+        register,
+        handleSubmit,
+        formState: { errors, isSubmitting },
+    } = useForm<LoginFormValues>({
+        resolver: zodResolver(loginSchema),
+        defaultValues: {
+            email: "",
+            password: "",
+        },
+    });
 
     // Redirect if already authenticated
     useEffect(() => {
@@ -43,18 +55,13 @@ export default function LoginPage() {
         }
     }, [isAuthenticated, navigate]);
 
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-        setIsLoading(true);
-
+    const onSubmit = async (values: LoginFormValues) => {
         try {
-            await login({ email, password });
+            await login(values);
             // Navigation will happen via useEffect when isAuthenticated changes
         } catch (error) {
             const message = error instanceof Error ? error.message : "Login failed";
             toast.error(message);
-        } finally {
-            setIsLoading(false);
         }
     };
 
@@ -73,20 +80,20 @@ export default function LoginPage() {
                             </CardDescription>
                         </CardHeader>
                         <CardContent>
-                            <form onSubmit={handleSubmit}>
+                            <form onSubmit={handleSubmit(onSubmit)} noValidate>
                                 <FieldGroup>
-                                    <Field>
+                                    <Field data-invalid={Boolean(errors.email)}>
                                         <FieldLabel htmlFor="email">Email</FieldLabel>
                                         <Input
                                             id="email"
                                             type="email"
                                             placeholder="m@example.com"
-                                            required
-                                            value={email}
-                                            onChange={(e) => setEmail(e.target.value)}
+                                            aria-invalid={Boolean(errors.email)}
+                                            {...register("email")}
                                         />
+                                        <FieldError errors={[errors.email]} />
                                     </Field>
-                                    <Field>
+                                    <Field data-invalid={Boolean(errors.password)}>
                                         <div className="flex items-center">
                                             <FieldLabel htmlFor="password">Password</FieldLabel>
                                             <Link
@@ -99,14 +106,14 @@ export default function LoginPage() {
                                         <Input
                                             id="password"
                                             type="password"
-                                            required
-                                            value={password}
-                                            onChange={(e) => setPassword(e.target.value)}
+                                            aria-invalid={Boolean(errors.password)}
+                                            {...register("password")}
                                         />
+                                        <FieldError errors={[errors.password]} />
                                     </Field>
                                     <Field>
-                                        <Button type="submit" disabled={isLoading}>
-                                            {isLoading ? "Logging in..." : "Login"}
+                                        <Button type="submit" disabled={isSubmitting}>
+                                            {isSubmitting ? "Logging in..." : "Login"}
                                         </Button>
                                         <Button variant="outline" type="button">
                                             Login with Google

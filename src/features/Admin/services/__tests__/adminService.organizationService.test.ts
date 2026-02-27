@@ -75,6 +75,15 @@ describe("organizationService.listOrganizations", () => {
 
     await expect(organizationService.listOrganizations()).rejects.toThrow("Failed to list organizations");
   });
+
+  it("throws fallback when json parse fails — covers .catch(() => ({})) branch", async () => {
+    mockFetchWithAuth.mockResolvedValue({
+      ok: false,
+      json: () => Promise.reject(new Error("parse error")),
+    });
+
+    await expect(organizationService.listOrganizations()).rejects.toThrow("Failed to list organizations");
+  });
 });
 
 describe("organizationService.createOrganization", () => {
@@ -186,6 +195,15 @@ describe("organizationService.deleteOrganization", () => {
 
     await expect(organizationService.deleteOrganization("org-1")).rejects.toThrow("Failed to delete organization");
   });
+
+  it("throws fallback when json parse fails — covers .catch(() => ({})) branch", async () => {
+    mockFetchWithAuth.mockResolvedValue({
+      ok: false,
+      json: () => Promise.reject(new Error("parse error")),
+    });
+
+    await expect(organizationService.deleteOrganization("org-1")).rejects.toThrow("Failed to delete organization");
+  });
 });
 
 describe("organizationService.listMembers", () => {
@@ -227,6 +245,15 @@ describe("organizationService.addMember", () => {
 
     await expect(organizationService.addMember("org-1", "user-1", "admin")).rejects.toThrow("Role escalation forbidden");
   });
+
+  it("throws fallback when json parse fails — covers .catch(() => ({})) branch", async () => {
+    mockFetchWithAuth.mockResolvedValue({
+      ok: false,
+      json: () => Promise.reject(new Error("parse error")),
+    });
+
+    await expect(organizationService.addMember("org-1", "u-1", "member")).rejects.toThrow("Failed to add member");
+  });
 });
 
 describe("organizationService.inviteMember", () => {
@@ -244,6 +271,17 @@ describe("organizationService.inviteMember", () => {
 
     await expect(organizationService.inviteMember({ organizationId: "org-1", email: "a@b.com", role: "member" })).rejects.toThrow("Already a member");
   });
+
+  it("throws fallback when json parse fails — covers .catch(() => ({})) branch", async () => {
+    mockFetchWithAuth.mockResolvedValue({
+      ok: false,
+      json: () => Promise.reject(new Error("parse error")),
+    });
+
+    await expect(
+      organizationService.inviteMember({ organizationId: "org-1", email: "a@b.com", role: "member" }),
+    ).rejects.toThrow("Failed to invite member");
+  });
 });
 
 describe("organizationService.removeMember", () => {
@@ -260,6 +298,17 @@ describe("organizationService.removeMember", () => {
 
     await expect(organizationService.removeMember({ organizationId: "org-1", memberId: "m-1" })).rejects.toThrow("Cannot remove last admin");
   });
+
+  it("throws fallback when json parse fails — covers .catch(() => ({})) branch", async () => {
+    mockFetchWithAuth.mockResolvedValue({
+      ok: false,
+      json: () => Promise.reject(new Error("parse error")),
+    });
+
+    await expect(
+      organizationService.removeMember({ organizationId: "org-1", memberId: "m-1" }),
+    ).rejects.toThrow("Failed to remove member");
+  });
 });
 
 describe("organizationService.updateMemberRole", () => {
@@ -275,6 +324,17 @@ describe("organizationService.updateMemberRole", () => {
     mockFetchWithAuth.mockResolvedValue(errJson("Role update failed"));
 
     await expect(organizationService.updateMemberRole({ organizationId: "org-1", memberId: "m-1", role: "member" })).rejects.toThrow("Role update failed");
+  });
+
+  it("throws fallback when json parse fails — covers .catch(() => ({})) branch", async () => {
+    mockFetchWithAuth.mockResolvedValue({
+      ok: false,
+      json: () => Promise.reject(new Error("parse error")),
+    });
+
+    await expect(
+      organizationService.updateMemberRole({ organizationId: "org-1", memberId: "m-1", role: "member" }),
+    ).rejects.toThrow("Failed to update member role");
   });
 });
 
@@ -300,6 +360,15 @@ describe("organizationService.listInvitations", () => {
 
     await expect(organizationService.listInvitations("org-1")).rejects.toThrow("Forbidden");
   });
+
+  it("throws fallback when json parse fails — covers .catch(() => ({})) branch", async () => {
+    mockFetchWithAuth.mockResolvedValue({
+      ok: false,
+      json: () => Promise.reject(new Error("parse error")),
+    });
+
+    await expect(organizationService.listInvitations("org-1")).rejects.toThrow("Failed to list invitations");
+  });
 });
 
 describe("organizationService.cancelInvitation", () => {
@@ -316,6 +385,17 @@ describe("organizationService.cancelInvitation", () => {
 
     await expect(organizationService.cancelInvitation({ organizationId: "org-1", invitationId: "inv-1" })).rejects.toThrow("Invitation not found");
   });
+
+  it("throws fallback when json parse fails — covers .catch(() => ({})) branch", async () => {
+    mockFetchWithAuth.mockResolvedValue({
+      ok: false,
+      json: () => Promise.reject(new Error("parse error")),
+    });
+
+    await expect(
+      organizationService.cancelInvitation({ organizationId: "org-1", invitationId: "inv-1" }),
+    ).rejects.toThrow("Failed to cancel invitation");
+  });
 });
 
 describe("organizationService.deleteInvitation", () => {
@@ -331,6 +411,15 @@ describe("organizationService.deleteInvitation", () => {
     mockFetchWithAuth.mockResolvedValue(errJson("Not found"));
 
     await expect(organizationService.deleteInvitation("org-1", "inv-1")).rejects.toThrow("Not found");
+  });
+
+  it("throws fallback when json parse fails — covers .catch(() => ({})) branch", async () => {
+    mockFetchWithAuth.mockResolvedValue({
+      ok: false,
+      json: () => Promise.reject(new Error("parse error")),
+    });
+
+    await expect(organizationService.deleteInvitation("org-1", "inv-1")).rejects.toThrow("Failed to delete invitation");
   });
 });
 
