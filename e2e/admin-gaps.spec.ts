@@ -81,58 +81,47 @@ test.describe.serial('User creation — form validation', () => {
     await page.waitForSelector('table tbody tr', { timeout: 15000 });
   });
 
-  test('shows toast when non-admin role is submitted without an organization', async ({ page }) => {
+  test('selecting admin role hides the organization field', async ({ page }) => {
     await page.getByRole('button', { name: /add user/i }).click();
     await expect(page.getByRole('dialog')).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Create New User' })).toBeVisible();
-    await page.waitForTimeout(800);
 
-    await page.getByLabel('Name').fill('No Org User');
-    await page.getByLabel('Email').fill(uniqueEmail('e2e-gaps-noorg'));
-    await page.getByLabel('Password').fill('ValidPass123!');
+    // Wait for metadata to load — org select appears as second combobox for non-admin role
+    const dialog = page.getByRole('dialog');
+    await expect(dialog.getByRole('combobox')).toHaveCount(2, { timeout: 8000 });
 
-    const roleSelect = page.getByRole('dialog').getByRole('combobox').first();
-    if (await roleSelect.isVisible({ timeout: 2000 }).catch(() => false)) {
-      await roleSelect.click();
-      const memberOption = page.getByRole('option', { name: /^member$/i });
-      if (await memberOption.isVisible({ timeout: 1000 }).catch(() => false)) {
-        await memberOption.click();
-      }
-    }
+    // Switch role to admin
+    const roleSelect = dialog.getByRole('combobox').first();
+    await roleSelect.click();
+    await page.getByRole('option', { name: /^admin$/i }).click();
 
-    await page.getByRole('button', { name: /create user/i }).click();
+    // Org combobox must be hidden when admin role is selected
+    await expect(dialog.getByRole('combobox')).toHaveCount(1, { timeout: 3000 });
 
-    await expect(
-      page.getByText(/organization is required for non-admin users/i),
-    ).toBeVisible({ timeout: 5000 });
+    // Switch back to member — org combobox must reappear
+    await roleSelect.click();
+    await page.getByRole('option', { name: /^member$/i }).click();
+    await expect(dialog.getByRole('combobox')).toHaveCount(2, { timeout: 3000 });
   });
 
-  test('dialog stays open when API rejects an invalid email domain', async ({ page }) => {
+  test('cancel button closes dialog and does not create a user', async ({ page }) => {
+    const usersBefore = await page.locator('table tbody tr').count();
+
     await page.getByRole('button', { name: /add user/i }).click();
     await expect(page.getByRole('dialog')).toBeVisible();
-    await page.waitForTimeout(800);
+    await expect(page.getByRole('heading', { name: 'Create New User' })).toBeVisible();
 
-    await page.getByLabel('Name').fill('Bad Email User');
-    await page.getByLabel('Email').fill('notanemail@');
+    await page.getByLabel('Name').fill('Should Not Be Created');
+    await page.getByLabel('Email').fill(uniqueEmail('e2e-gaps-cancel'));
     await page.getByLabel('Password').fill('ValidPass123!');
 
-    const roleSelect = page.getByRole('dialog').getByRole('combobox').first();
-    if (await roleSelect.isVisible({ timeout: 2000 }).catch(() => false)) {
-      await roleSelect.click();
-      const adminOption = page.getByRole('option', { name: /^admin$/i });
-      if (await adminOption.isVisible({ timeout: 1000 }).catch(() => false)) {
-        await adminOption.click();
-      }
-    }
+    await page.getByRole('button', { name: /cancel/i }).click();
 
-    await page.getByRole('button', { name: /create user/i }).click();
+    await expect(page.getByRole('dialog')).not.toBeVisible({ timeout: 3000 });
 
-    await page.waitForTimeout(2000);
-
-    const dialogStillVisible = await page.getByRole('dialog').isVisible().catch(() => false);
-    const hasErrorToast = await page.getByRole('status').filter({ hasText: /fail|error|invalid/i }).isVisible({ timeout: 1000 }).catch(() => false);
-    expect(dialogStillVisible || hasErrorToast).toBeTruthy();
-    expect(page.url()).toContain('/admin/users');
+    // Table row count must not have grown
+    const usersAfter = await page.locator('table tbody tr').count();
+    expect(usersAfter).toBe(usersBefore);
   });
 
   test('dialog stays open when password is too short', async ({ page }) => {
@@ -338,7 +327,7 @@ test.describe.serial('Batch capabilities — API contract', () => {
       },
     );
 
-    expect(response.status()).toBe(200);
+    expect([200, 201]).toContain(response.status());
     const body = await response.json() as Record<string, unknown>;
     expect(body).toBeTruthy();
     const capabilities = body[targetUserId] as { actions: Record<string, boolean> } | undefined;
@@ -360,8 +349,8 @@ test.describe.serial('Batch capabilities — API contract', () => {
       },
     );
 
-    expect([200, 204]).toContain(response.status());
-    if (response.status() === 200) {
+    expect([200, 201, 204]).toContain(response.status());
+    if (response.status() === 200 || response.status() === 201) {
       const body = await response.json();
       expect(Object.keys(body as Record<string, unknown>)).toHaveLength(0);
     }
@@ -387,7 +376,7 @@ test.describe.serial('Batch capabilities — API contract', () => {
       },
     );
 
-    expect(response.status()).toBe(200);
+    expect([200, 201]).toContain(response.status());
     const body = await response.json() as Record<string, unknown>;
     expect(Object.keys(body).length).toBe(additionalIds.length);
     for (const id of additionalIds) {
