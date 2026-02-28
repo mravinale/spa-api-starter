@@ -23,10 +23,12 @@ export const userKeys = {
 /**
  * Hook to fetch paginated list of users with server-side filtering.
  */
-export function useUsers(params: UserFilterParams = {}) {
+export function useUsers(params: UserFilterParams & { enabled?: boolean } = {}) {
+    const { enabled = true, ...filterParams } = params;
     return useQuery({
-        queryKey: userKeys.list(params),
-        queryFn: () => adminService.listUsers(params),
+        queryKey: userKeys.list(filterParams),
+        queryFn: () => adminService.listUsers(filterParams),
+        enabled,
     });
 }
 
