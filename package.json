@@ -40,7 +40,9 @@
     "pretest:e2e:isolate:auth": "npm run playwright:install:chromium",
     "test:e2e:isolate:auth": "E2E_API_BASE_URL=http://127.0.0.1:3100 E2E_FE_URL=http://127.0.0.1:4173 E2E_DATABASE_URL=postgresql://mravinale@localhost:5432/nestjs_api_starter_e2e E2E_TEST_USER_EMAIL=delivered+e2e-auth@resend.dev E2E_TEST_USER_PASSWORD=password123 playwright test e2e/auth.spec.ts",
     "pretest:e2e:isolate:admin": "npm run playwright:install:chromium",
-    "test:e2e:isolate:admin": "E2E_API_BASE_URL=http://127.0.0.1:3100 E2E_FE_URL=http://127.0.0.1:4173 E2E_DATABASE_URL=postgresql://mravinale@localhost:5432/nestjs_api_starter_e2e E2E_TEST_USER_EMAIL=delivered+e2e-admin@resend.dev E2E_TEST_USER_PASSWORD=password123 playwright test e2e/admin.spec.ts"
+    "test:e2e:isolate:admin": "E2E_API_BASE_URL=http://127.0.0.1:3100 E2E_FE_URL=http://127.0.0.1:4173 E2E_DATABASE_URL=postgresql://mravinale@localhost:5432/nestjs_api_starter_e2e E2E_TEST_USER_EMAIL=delivered+e2e-admin@resend.dev E2E_TEST_USER_PASSWORD=password123 playwright test e2e/admin.spec.ts",
+    "pretest:e2e:gaps": "npm run playwright:install:chromium",
+    "test:e2e:gaps": "E2E_API_BASE_URL=http://127.0.0.1:3100 E2E_FE_URL=http://127.0.0.1:4173 playwright test e2e/admin-gaps.spec.ts"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
