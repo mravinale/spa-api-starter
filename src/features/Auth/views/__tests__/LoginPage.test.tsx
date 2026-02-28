@@ -101,6 +101,25 @@ describe("LoginPage", () => {
     });
   });
 
+  it("shows fallback 'Login failed' when a non-Error is thrown — covers instanceof branch", async () => {
+    const user = userEvent.setup();
+    mockLogin.mockRejectedValue("string error");
+
+    render(
+      <MemoryRouter>
+        <LoginPage />
+      </MemoryRouter>,
+    );
+
+    await user.type(screen.getByLabelText(/email/i), "user@example.com");
+    await user.type(screen.getByLabelText(/password/i), "password123");
+    await user.click(screen.getByRole("button", { name: /^login$/i }));
+
+    await waitFor(() => {
+      expect(toast.error).toHaveBeenCalledWith("Login failed");
+    });
+  });
+
   it("redirects to dashboard when already authenticated", async () => {
     mockUseAuth.mockReturnValue({
       login: mockLogin,
