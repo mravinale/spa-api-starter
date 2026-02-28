@@ -47,7 +47,7 @@ describe("ProtectedRoute", () => {
   it("renders nothing while loading", () => {
     mockUseAuth.mockReturnValue({ isAuthenticated: false, isLoading: true });
 
-    const { container } = render(
+    render(
       <ProtectedRoute>
         <div data-testid="child">Protected Content</div>
       </ProtectedRoute>,
@@ -55,6 +55,6 @@ describe("ProtectedRoute", () => {
 
     expect(screen.queryByTestId("child")).toBeNull();
     expect(screen.queryByTestId("navigate")).toBeNull();
-    expect(container.firstChild).toBeNull();
+    expect(screen.getByTestId("route-guard-loading")).toBeInTheDocument();
   });
 });

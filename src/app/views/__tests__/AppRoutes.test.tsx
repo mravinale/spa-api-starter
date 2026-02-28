@@ -1,0 +1,78 @@
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { render, screen } from "@testing-library/react";
+
+const mockLoginPage = vi.fn(() => <div data-testid="login-page">Login Page</div>);
+
+vi.mock("@features/Auth", () => ({
+  LoginPage: () => mockLoginPage(),
+  SignupPage: () => <div data-testid="signup-page">Signup Page</div>,
+  VerifyEmailPage: () => <div>Verify Email</div>,
+  ForgotPasswordPage: () => <div>Forgot Password</div>,
+  SetNewPasswordPage: () => <div>Set New Password</div>,
+  AcceptInvitationPage: () => <div>Accept Invitation</div>,
+}));
+
+vi.mock("@features/Dashboard", () => ({
+  DashboardPage: () => <div>Dashboard</div>,
+}));
+
+vi.mock("@features/Admin", () => ({
+  UsersPage: () => <div>Users</div>,
+  SessionsPage: () => <div>Sessions</div>,
+  OrganizationsPage: () => <div>Organizations</div>,
+  RolesPage: () => <div>Roles</div>,
+}));
+
+vi.mock("../RootLayout", () => ({
+  default: () => <div>Root Layout</div>,
+}));
+
+vi.mock("@shared/components/ui", () => ({
+  ThemeProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+}));
+
+vi.mock("@shared/components/ui/sonner", () => ({
+  Toaster: () => <div data-testid="toaster" />,
+}));
+
+vi.mock("@shared/context/AuthContext", () => ({
+  AuthProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+}));
+
+vi.mock("@shared/context/PermissionsContext", () => ({
+  PermissionsProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+}));
+
+vi.mock("@shared/components/ProtectedRoute", () => ({
+  ProtectedRoute: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+}));
+
+vi.mock("@shared/components/AdminRoute", () => ({
+  AdminRoute: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+}));
+
+import AppRoutes from "../AppRoutes";
+
+describe("AppRoutes", () => {
+  beforeEach(() => {
+    window.history.pushState({}, "", "/login");
+    mockLoginPage.mockImplementation(() => <div data-testid="login-page">Login Page</div>);
+  });
+
+  it("renders login route and toaster", () => {
+    render(<AppRoutes />);
+
+    expect(screen.getByTestId("login-page")).toBeInTheDocument();
+    expect(screen.getByTestId("toaster")).toBeInTheDocument();
+  });
+
+  it("renders fallback UI when a route component throws", () => {
+    mockLoginPage.mockImplementation(() => {
+      throw new Error("route failed");
+    });
+
+    render(<AppRoutes />);
+
+    expect(screen.getByText("Something went wrong")).toBeInTheDocument();
+  });
+});

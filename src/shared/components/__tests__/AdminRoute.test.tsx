@@ -99,31 +99,34 @@ describe("AdminRoute", () => {
     expect(nav.getAttribute("data-to")).toBe("/");
   });
 
-  it("renders nothing while auth is loading", () => {
+  it("renders loading indicator while auth is loading", () => {
     mockUseAuth.mockReturnValue({ isAuthenticated: false, isAdminOrManager: false, isLoading: true });
     mockUsePermissionsContext.mockReturnValue(permissionsGranted);
 
-    const { container } = render(
+    render(
       <AdminRoute>
         <div data-testid="child">Admin Content</div>
       </AdminRoute>,
     );
 
-    expect(container.firstChild).toBeNull();
     expect(screen.queryByTestId("child")).toBeNull();
+    expect(screen.queryByTestId("navigate")).toBeNull();
+    expect(screen.getByTestId("route-guard-loading")).toBeInTheDocument();
   });
 
-  it("renders nothing while permissions are loading", () => {
+  it("renders loading indicator while permissions are loading", () => {
     mockUseAuth.mockReturnValue(authenticatedAdmin);
     mockUsePermissionsContext.mockReturnValue(permissionsLoading);
 
-    const { container } = render(
+    render(
       <AdminRoute>
         <div data-testid="child">Admin Content</div>
       </AdminRoute>,
     );
 
-    expect(container.firstChild).toBeNull();
+    expect(screen.queryByTestId("child")).toBeNull();
+    expect(screen.queryByTestId("navigate")).toBeNull();
+    expect(screen.getByTestId("route-guard-loading")).toBeInTheDocument();
   });
 
   it("redirects when requiredPermission is not granted", () => {

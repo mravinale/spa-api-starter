@@ -148,6 +148,48 @@ describe('adminService.impersonateUser', () => {
                 }),
             ).rejects.toThrow('Not a member');
         });
+
+        it('should throw when org-scoped response has no sessionToken — covers line 319', async () => {
+            mockFetchWithAuth.mockResolvedValue({
+                ok: true,
+                json: () => Promise.resolve({}),
+            });
+
+            await expect(
+                adminService.impersonateUser('user-1', {
+                    role: 'manager',
+                    organizationId: 'org-1',
+                }),
+            ).rejects.toThrow('Missing impersonation session token');
+        });
+    });
+});
+
+describe('adminService.stopImpersonating — additional branch coverage', () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+        localStorageMock.clear();
+    });
+
+    it('throws on non-missing-session admin stop error — covers line 343', async () => {
+        localStorageMock.setItem('original_bearer_token', 'original-token');
+        localStorageMock.setItem('impersonation_mode', 'admin');
+        vi.clearAllMocks();
+        mockAdminStopImpersonating.mockResolvedValue({
+            error: { code: 'UNEXPECTED_ERROR', message: 'Unexpected server error' },
+        });
+
+        await expect(adminService.stopImpersonating()).rejects.toThrow('Unexpected server error');
+    });
+
+    it('throws when stopOrgImpersonating returns error — covers line 385', async () => {
+        localStorageMock.setItem('impersonation_mode', 'org');
+        vi.clearAllMocks();
+        mockAdminStopOrgImpersonating.mockResolvedValue({
+            error: { message: 'Stop org impersonating failed' },
+        });
+
+        await expect(adminService.stopImpersonating()).rejects.toThrow('Stop org impersonating failed');
     });
 });
 
