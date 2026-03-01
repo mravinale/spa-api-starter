@@ -109,13 +109,15 @@ test.describe.serial('RBAC Roles matrix (UI-aligned)', () => {
     await expect(page.locator('[data-testid="role-card-manager"]')).not.toBeVisible();
   });
 
-  test('manager cannot see manage/edit/delete role actions without role permissions', async ({ page }) => {
+  test('manager can see manage permissions action on member role (has role:assign)', async ({ page }) => {
     await loginAs(page, 'manager');
     await openRolesPage(page);
 
     const memberCard = page.locator('[data-testid="role-card-member"]');
     await expect(memberCard).toBeVisible();
-    await expect(memberCard.getByRole('button', { name: /manage/i })).toHaveCount(0);
+    // Manager has role:assign permission, so they can manage permissions
+    await expect(memberCard.getByRole('button', { name: /manage/i })).toBeVisible();
+    // Member is a system role (isSystem: true), so no Edit/Delete buttons are shown
     await expect(memberCard.getByRole('button', { name: /^edit$/i })).toHaveCount(0);
     await expect(memberCard.locator('button.text-destructive')).toHaveCount(0);
   });

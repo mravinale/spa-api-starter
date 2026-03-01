@@ -14,6 +14,12 @@ async function ensureDefaultRolePermissions(pool: Pool): Promise<void> {
      ON CONFLICT DO NOTHING`,
   );
 
+  // Clear existing manager permissions to ensure clean state
+  await pool.query(
+    `DELETE FROM role_permissions
+     WHERE role_id = (SELECT id FROM roles WHERE name = 'manager')`,
+  );
+
   const managerPermissions = [
     ['user', 'read'],
     ['user', 'update'],
@@ -21,9 +27,10 @@ async function ensureDefaultRolePermissions(pool: Pool): Promise<void> {
     ['session', 'read'],
     ['session', 'revoke'],
     ['organization', 'read'],
-    ['organization', 'update'],
     ['organization', 'invite'],
     ['role', 'read'],
+    ['role', 'assign'],
+    ['role', 'update'],
   ] as const;
 
   for (const [resource, action] of managerPermissions) {
@@ -32,8 +39,7 @@ async function ensureDefaultRolePermissions(pool: Pool): Promise<void> {
        SELECT r.id, p.id
        FROM roles r
        JOIN permissions p ON p.resource = $2 AND p.action = $3
-       WHERE r.name = $1
-       ON CONFLICT DO NOTHING`,
+       WHERE r.name = $1`,
       ['manager', resource, action],
     );
   }

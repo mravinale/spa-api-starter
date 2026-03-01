@@ -114,7 +114,7 @@ test.describe.serial('RBAC Users matrix (UI-aligned)', () => {
 
     await ensureOrganizationMembership({
       userEmail: adminTargetEmail,
-      role: 'owner',
+      role: 'admin',
       orgSlug,
       orgName: 'E2E RBAC Users Matrix Org',
     });
