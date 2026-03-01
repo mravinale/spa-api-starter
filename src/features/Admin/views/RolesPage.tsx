@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import {
   useRoles,
   useCreateRole,
@@ -7,6 +7,7 @@ import {
   usePermissionsGrouped,
   useAssignPermissions,
 } from "../hooks/useRoles";
+import { useAuth } from "@/shared/context/AuthContext";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/shared/components/ui/card";
 import { Badge } from "@/shared/components/ui/badge";
 import { Button } from "@/shared/components/ui/button";
@@ -37,7 +38,6 @@ import {
 import { toast } from "sonner";
 import { roleColorMap, ROLE_COLORS } from "../types/rbac";
 import type { Role, Permission } from "../types/rbac";
-import { useAuth } from "@/shared/context/AuthContext";
 import { usePermissionsContext } from "@/shared/context/PermissionsContext";
 
 /**
@@ -147,12 +147,9 @@ function RoleCard({
  * Allows CRUD operations on roles and permission management.
  */
 export function RolesPage() {
-  const { isAdmin } = useAuth();
   const { can } = usePermissionsContext();
-  const { data: allRoles = [], isLoading } = useRoles();
-  
-  // Managers can only see and edit the "member" role
-  const roles = isAdmin ? allRoles : allRoles.filter(role => role.name === "member");
+  const { user } = useAuth();
+  const { data: roles = [], isLoading } = useRoles();
   const { data: permissionsGrouped = {} } = usePermissionsGrouped();
   const createRole = useCreateRole();
   const updateRole = useUpdateRole();
@@ -163,6 +160,15 @@ export function RolesPage() {
   const canUpdateRole = can("role", "update");
   const canDeleteRole = can("role", "delete");
   const canAssignRolePermissions = can("role", "assign");
+
+  // Filter roles based on user's platform role
+  // Managers can only work with member role, admins see all roles
+  const visibleRoles = useMemo(() => {
+    if (user?.role === 'manager') {
+      return roles.filter(role => role.name === 'member');
+    }
+    return roles;
+  }, [roles, user?.role]);
   
   // State for role permissions (fetched individually)
   const [rolePermissions, setRolePermissions] = useState<Record<string, Permission[]>>({});
@@ -338,7 +344,7 @@ export function RolesPage() {
             Manage role-based access control for your application
           </p>
         </div>
-        {isAdmin && canCreateRole && (
+        {canCreateRole && (
           <Button onClick={() => setCreateDialogOpen(true)}>
             <IconPlus className="h-4 w-4 mr-2" />
             Create Role
@@ -348,7 +354,7 @@ export function RolesPage() {
 
       {/* Roles Grid */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {roles.map((role) => (
+        {visibleRoles.map((role) => (
           <RoleCard 
             key={role.id} 
             role={role}

@@ -48,6 +48,7 @@ export function SessionsPage() {
   const [selectedUser, setSelectedUser] = useState<AdminUser | null>(null)
   const [revokeAllDialogOpen, setRevokeAllDialogOpen] = useState(false)
   const { can } = usePermissionsContext()
+  const canReadUsers = can("user", "read")
   const canRevokeSessions = can("session", "revoke")
 
   // Queries
@@ -57,6 +58,7 @@ export function SessionsPage() {
     searchValue: searchValue || undefined,
     searchField: searchValue ? "name" : undefined,
     searchOperator: searchValue ? "contains" : undefined,
+    enabled: canReadUsers,
   })
 
   const { data: sessions, isLoading: sessionsLoading, refetch: refetchSessions } = useUserSessions(
@@ -117,6 +119,12 @@ export function SessionsPage() {
             <CardDescription>Select a user to view their sessions</CardDescription>
           </CardHeader>
           <CardContent>
+            {!canReadUsers ? (
+              <div className="text-center py-8 text-muted-foreground">
+                You do not have permission to view users. Contact an administrator to grant <strong>user:read</strong> permission.
+              </div>
+            ) : (
+              <>
             <div className="mb-4">
               <Input
                 placeholder="Search users..."
@@ -174,6 +182,8 @@ export function SessionsPage() {
                 </Button>
               </div>
             </div>
+              </>
+            )}
           </CardContent>
         </Card>
 
