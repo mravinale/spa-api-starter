@@ -493,7 +493,7 @@ VITE_API_URL=http://localhost:3000
 | Tailwind CSS | 4.x | Styling |
 | shadcn/ui | - | UI components |
 | react-hook-form | 7.x | Form state management |
-| Zod | 3.x | Schema validation |
+| Zod | 4.x | Schema validation |
 | Vitest | 3.x | Unit testing |
 | Playwright | 1.x | E2E testing |
 

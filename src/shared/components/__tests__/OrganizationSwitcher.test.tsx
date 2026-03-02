@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest"
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 import { render, screen, waitFor, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { toast } from "sonner"
@@ -62,6 +62,10 @@ describe("OrganizationSwitcher", () => {
     mockCreateOrganization.mockResolvedValue({ id: "org-2", name: "New Org" })
   })
 
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
   it("renders a skeleton while organizations are loading", () => {
     mockOrganization.list.mockReturnValue(new Promise(() => {}))
 
@@ -118,6 +122,7 @@ describe("OrganizationSwitcher", () => {
     await waitFor(() => {
       expect(mockOrganization.setActive).toHaveBeenCalledWith({ organizationId: "org-1" })
       expect(toast.success).toHaveBeenCalledWith("Switched organization")
+      expect(window.location.reload).toHaveBeenCalled()
     })
   })
 

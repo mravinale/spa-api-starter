@@ -44,7 +44,7 @@ describe("ProtectedRoute", () => {
     expect(screen.queryByTestId("child")).toBeNull();
   });
 
-  it("renders nothing while loading", () => {
+  it("renders loading indicator while loading", () => {
     mockUseAuth.mockReturnValue({ isAuthenticated: false, isLoading: true });
 
     render(

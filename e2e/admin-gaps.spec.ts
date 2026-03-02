@@ -21,6 +21,12 @@ async function ensureAdminRole(): Promise<void> {
   });
 }
 
+async function restoreUser(): Promise<void> {
+  await withDatabase(async (pool) => {
+    await pool.query(`UPDATE "user" SET role = 'member', "emailVerified" = false WHERE email = $1`, [TEST_USER.email]);
+  });
+}
+
 async function createOrganizationFixture(slug: string, name: string): Promise<string> {
   return await withDatabase(async (pool) => {
     const result = await pool.query<{ id: string }>(
@@ -150,6 +156,10 @@ test.describe.serial('User creation — form validation', () => {
     const hasErrorToast = await page.getByRole('status').filter({ hasText: /fail|error|password/i }).isVisible({ timeout: 1000 }).catch(() => false);
     expect(dialogStillVisible || hasErrorToast).toBeTruthy();
   });
+
+  test.afterAll(async () => {
+    await restoreUser();
+  });
 });
 
 // ─── Suite 2: Bulk Delete — Execution ────────────────────────────────────────
@@ -200,8 +210,7 @@ test.describe.serial('Bulk delete — execution flow', () => {
     const targetRow = rows.filter({ hasText: THROWAWAY_USER_EMAIL }).first();
     const existsBeforeDelete = await targetRow.isVisible({ timeout: 5000 }).catch(() => false);
 
-    test.skip(!existsBeforeDelete, 'throwaway user not found in table after search');
-    if (!existsBeforeDelete) return;
+    expect(existsBeforeDelete).toBeTruthy();
 
     await targetRow.getByRole('checkbox').click();
     await expect(page.getByRole('button', { name: /delete \(1\)/i })).toBeVisible();
@@ -215,6 +224,10 @@ test.describe.serial('Bulk delete — execution flow', () => {
 
     await expect(page.getByRole('dialog')).not.toBeVisible({ timeout: 10000 });
     await expect(page.getByRole('button', { name: /delete \(\d+\)/i })).not.toBeVisible({ timeout: 5000 });
+  });
+
+  test.afterAll(async () => {
+    await restoreUser();
   });
 });
 
@@ -245,7 +258,8 @@ test.describe.serial('Invitation CRUD — API contract', () => {
     const body = await response.json();
     const invitation = body?.data ?? body;
     expect(invitation).toBeTruthy();
-    createdInvitationId = invitation?.id ?? invitation?.data?.id ?? '';
+    expect(invitation?.id).toBeTruthy();
+    createdInvitationId = invitation.id;
   });
 
   test('GET /invitations lists the invitation just created', async ({ request }) => {
@@ -294,6 +308,10 @@ test.describe.serial('Invitation CRUD — API contract', () => {
       : (body?.data ?? []);
     const stillPending = list.find((inv) => inv.id === createdInvitationId && inv.status === 'pending');
     expect(stillPending).toBeFalsy();
+  });
+
+  test.afterAll(async () => {
+    await restoreUser();
   });
 });
 
@@ -394,5 +412,9 @@ test.describe.serial('Batch capabilities — API contract', () => {
     );
 
     expect([401, 403]).toContain(response.status());
+  });
+
+  test.afterAll(async () => {
+    await restoreUser();
   });
 });

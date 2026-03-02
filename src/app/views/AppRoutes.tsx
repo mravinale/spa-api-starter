@@ -1,4 +1,4 @@
-import { BrowserRouter, Route, Routes, Navigate } from "react-router-dom";
+import { BrowserRouter, Route, Routes, Navigate, useLocation } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import "../styles/globals.css";
 import {
@@ -22,15 +22,16 @@ import { Toaster } from "@shared/components/ui/sonner";
 
 const queryClient = new QueryClient();
 
-const AppRoutes = () => {
+const AppRoutesContent = () => {
+  const location = useLocation();
+
   return (
     <ThemeProvider defaultTheme="system" storageKey="vite-ui-theme">
-      <BrowserRouter>
-        <QueryClientProvider client={queryClient}>
-          <AuthProvider>
-            <PermissionsProvider>
-              <ErrorBoundary>
-                <Routes>
+      <QueryClientProvider client={queryClient}>
+        <AuthProvider>
+          <PermissionsProvider>
+            <ErrorBoundary resetKey={location.pathname}>
+              <Routes>
                   {/* Auth routes */}
                   <Route path="/login" element={<LoginPage />} />
                   <Route path="/signup" element={<SignupPage />} />
@@ -91,8 +92,15 @@ const AppRoutes = () => {
           </AuthProvider>
           <Toaster richColors position="top-right" />
         </QueryClientProvider>
-      </BrowserRouter>
-    </ThemeProvider>
+      </ThemeProvider>
+    );
+  };
+
+const AppRoutes = () => {
+  return (
+    <BrowserRouter>
+      <AppRoutesContent />
+    </BrowserRouter>
   );
 };
 

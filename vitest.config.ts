@@ -22,7 +22,6 @@ export default defineConfig({
         '**/*.spec.{ts,tsx}',
         'src/shared/components/ui/dropdown-menu.tsx',
         'src/shared/components/ui/separator.tsx',
-        'src/shared/components/ui/theme-provider.tsx',
       ],
     },
   },
