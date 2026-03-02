@@ -91,6 +91,20 @@ export const adminService = {
         return await response.json();
     },
 
+    async getBatchCapabilities(userIds: string[]): Promise<Record<string, UserCapabilities>> {
+        if (userIds.length === 0) return {};
+        const response = await fetchWithAuth(`${API_BASE_URL}/api/admin/users/capabilities/batch`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ userIds }),
+        });
+        if (!response.ok) {
+            const error = await response.json().catch(() => ({}));
+            throw new Error(error.message || "Failed to fetch batch capabilities");
+        }
+        return await response.json();
+    },
+
     /**
      * Create a new user.
      */

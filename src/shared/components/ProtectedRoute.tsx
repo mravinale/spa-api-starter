@@ -1,12 +1,12 @@
 import { Navigate } from "react-router-dom";
 import { useAuth } from "@shared/context/AuthContext";
+import { RouteGuardLoading } from "@shared/components/RouteGuardLoading";
 
 export function ProtectedRoute({ children }: { children: React.ReactNode }) {
     const { isAuthenticated, isLoading } = useAuth();
 
-    // Show nothing while checking authentication status
     if (isLoading) {
-        return null;
+        return <RouteGuardLoading />;
     }
 
     if (!isAuthenticated) {

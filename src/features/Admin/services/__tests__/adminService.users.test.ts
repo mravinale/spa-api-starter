@@ -69,6 +69,15 @@ describe("adminService.listUsers", () => {
 
     await expect(adminService.listUsers()).rejects.toThrow("Unauthorized");
   });
+
+  it("throws fallback message when json parse fails — covers .catch(() => ({})) branch", async () => {
+    mockFetchWithAuth.mockResolvedValue({
+      ok: false,
+      json: () => Promise.reject(new Error("parse error")),
+    });
+
+    await expect(adminService.listUsers()).rejects.toThrow("Failed to list users");
+  });
 });
 
 describe("adminService.getUserCapabilities", () => {
@@ -143,6 +152,17 @@ describe("adminService.createUser", () => {
     await expect(
       adminService.createUser({ name: "X", email: "x@x.com", password: "P", role: "member" }),
     ).rejects.toThrow("Email already exists");
+  });
+
+  it("throws fallback when json parse fails — covers .catch(() => ({})) branch", async () => {
+    mockFetchWithAuth.mockResolvedValue({
+      ok: false,
+      json: () => Promise.reject(new Error("parse error")),
+    });
+
+    await expect(
+      adminService.createUser({ name: "X", email: "x@x.com", password: "P", role: "member" }),
+    ).rejects.toThrow("Failed to create user");
   });
 });
 
@@ -260,6 +280,15 @@ describe("adminService.banUser", () => {
 
     await expect(adminService.banUser({ userId: "admin-1", banReason: "Test" })).rejects.toThrow("Cannot ban admin");
   });
+
+  it("throws fallback when json parse fails — covers .catch(() => ({})) branch", async () => {
+    mockFetchWithAuth.mockResolvedValue({
+      ok: false,
+      json: () => Promise.reject(new Error("parse error")),
+    });
+
+    await expect(adminService.banUser({ userId: "u-1", banReason: "x" })).rejects.toThrow("Failed to ban user");
+  });
 });
 
 describe("adminService.unbanUser", () => {
@@ -323,6 +352,15 @@ describe("adminService.setRole", () => {
     });
 
     await expect(adminService.setRole({ userId: "user-1", role: "admin" })).rejects.toThrow("Role change forbidden");
+  });
+
+  it("throws fallback when json parse fails — covers .catch(() => ({})) branch", async () => {
+    mockFetchWithAuth.mockResolvedValue({
+      ok: false,
+      json: () => Promise.reject(new Error("parse error")),
+    });
+
+    await expect(adminService.setRole({ userId: "u-1", role: "member" })).rejects.toThrow("Failed to set user role");
   });
 });
 

@@ -91,6 +91,17 @@ describe("rbacService.createRole", () => {
 
     await expect(rbacService.createRole({ name: "admin", displayName: "Admin" })).rejects.toThrow("Role already exists");
   });
+
+  it("throws fallback message when json parse fails — covers .catch(() => ({})) branch", async () => {
+    mockFetchWithAuth.mockResolvedValue({
+      ok: false,
+      json: () => Promise.reject(new Error("parse error")),
+    });
+
+    await expect(rbacService.createRole({ name: "x", displayName: "X" })).rejects.toThrow(
+      "Failed to create role",
+    );
+  });
 });
 
 describe("rbacService.updateRole", () => {
@@ -143,6 +154,15 @@ describe("rbacService.deleteRole", () => {
     });
 
     await expect(rbacService.deleteRole("admin")).rejects.toThrow("Cannot delete system role");
+  });
+
+  it("throws fallback message when json parse fails — covers .catch(() => ({})) branch", async () => {
+    mockFetchWithAuth.mockResolvedValue({
+      ok: false,
+      json: () => Promise.reject(new Error("parse error")),
+    });
+
+    await expect(rbacService.deleteRole("role-1")).rejects.toThrow("Failed to delete role");
   });
 });
 
