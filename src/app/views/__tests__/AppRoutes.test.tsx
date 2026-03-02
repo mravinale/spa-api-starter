@@ -14,6 +14,8 @@ vi.mock("@features/Auth", () => ({
 
 vi.mock("@features/Dashboard", () => ({
   DashboardPage: () => <div>Dashboard</div>,
+  SettingsPage: () => <div>Settings</div>,
+  AccountPage: () => <div>Account</div>,
 }));
 
 vi.mock("@features/Admin", () => ({
@@ -21,6 +23,7 @@ vi.mock("@features/Admin", () => ({
   SessionsPage: () => <div>Sessions</div>,
   OrganizationsPage: () => <div>Organizations</div>,
   RolesPage: () => <div>Roles</div>,
+  InvitationsPage: () => <div>Invitations</div>,
 }));
 
 vi.mock("../RootLayout", () => ({

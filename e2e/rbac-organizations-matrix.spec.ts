@@ -47,21 +47,30 @@ async function openOrganizationBySlug(page: Page, slug: string) {
   const searchInput = page.getByPlaceholder(/search organizations/i);
   await expect(searchInput).toBeVisible({ timeout: 10000 });
   await searchInput.fill(slug);
+  await page.waitForTimeout(500); // Wait for search to filter
 
-  const orgButton = page.locator('main button').filter({ hasText: `/${slug}` }).first();
-  const exactVisible = await orgButton.isVisible({ timeout: 5000 }).catch(() => false);
-  if (!exactVisible) {
-    const visibleOrgLabels = (await page.locator('main button').filter({ hasText: /\// }).allTextContents())
-      .map((label) => label.trim())
-      .filter(Boolean);
+  // Button text format is "OrgName/slug" - find button containing the slug
+  const allOrgButtons = page.locator('main button').filter({ hasText: /\// });
+  const count = await allOrgButtons.count();
+  
+  let foundButton = null;
+  for (let i = 0; i < count; i++) {
+    const button = allOrgButtons.nth(i);
+    const text = await button.textContent();
+    if (text && text.toLowerCase().includes(`/${slug.toLowerCase()}`)) {
+      foundButton = button;
+      break;
+    }
+  }
+
+  if (!foundButton) {
+    const visibleOrgLabels = await allOrgButtons.allTextContents();
     throw new Error(
       `Could not find organization button for slug "${slug}" after search. Visible organization labels: ${visibleOrgLabels.join(', ') || '(none)'}`,
     );
   }
 
-  await expect(orgButton).toBeVisible({ timeout: 15000 });
-  await orgButton.click({ force: true });
-
+  await foundButton.click();
   await expect(page.getByText(/manage members/i)).toBeVisible({ timeout: 15000 });
 }
 
@@ -121,7 +130,7 @@ test.describe.serial('RBAC Organizations matrix (UI-aligned)', () => {
 
     await ensureOrganizationMembership({
       userEmail: adminActorEmail,
-      role: 'owner',
+      role: 'admin',
       orgSlug: managedOrgSlug,
       orgName: 'E2E RBAC Organizations Matrix Org',
     });

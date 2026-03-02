@@ -122,7 +122,7 @@ async function ensureUserInOrganization(params: {
   emailPrefix: string;
   userRole: 'admin' | 'manager' | 'member';
   organizationId: string;
-  memberRole: 'owner' | 'manager' | 'member';
+  memberRole: 'admin' | 'manager' | 'member';
 }) {
   return await withDatabase(async (pool) => {
     const email = resendTestEmail('delivered', params.emailPrefix);
@@ -514,7 +514,7 @@ test.describe('Manager Role - Organization-Scoped Access', () => {
       emailPrefix: `mgr-no-actions-admin-${Date.now()}`,
       userRole: 'admin',
       organizationId: managerOrgId,
-      memberRole: 'owner',
+      memberRole: 'admin',
     });
     const managerTarget = await ensureUserInOrganization({
       emailPrefix: `mgr-no-actions-manager-${Date.now()}`,

@@ -180,7 +180,7 @@ test.describe.serial('RBAC capabilities API↔UI contract', () => {
 
     await ensureOrganizationMembership({
       userEmail: adminTargetEmail,
-      role: 'owner',
+      role: 'admin',
       orgSlug,
       orgName: 'E2E RBAC Capabilities Org',
     });

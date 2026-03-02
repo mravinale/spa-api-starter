@@ -25,10 +25,8 @@ test.describe('Navigation integrity', () => {
     }
     await expect(settingsItem).toBeVisible({ timeout: 10000 });
     await settingsItem.click();
-    await expect(page).toHaveURL('/');
-    await expect(
-      page.locator('[data-slot="sidebar"]').getByRole('link', { name: /^dashboard$/i }),
-    ).toBeVisible();
+    await expect(page).toHaveURL('/settings');
+    await expect(page.getByRole('heading', { name: /settings/i })).toBeVisible();
   });
 
   test('direct /invitations navigation should resolve to dashboard fallback', async ({ page }) => {

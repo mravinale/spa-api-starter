@@ -5,6 +5,7 @@ import {
   IconDashboard,
   IconHome,
   IconInnerShadowTop,
+  IconMail,
   IconShield,
   IconUsers,
   IconUserScan,
@@ -74,6 +75,15 @@ const getNavItems = (
       url: "/admin/roles",
       icon: IconShield,
       isActive: pathname === "/admin/roles",
+    })
+  }
+
+  if (can("organization", "read")) {
+    adminItems.push({
+      title: "Invitations",
+      url: "/admin/invitations",
+      icon: IconMail,
+      isActive: pathname === "/admin/invitations",
     })
   }
 

@@ -160,7 +160,7 @@ export function OrganizationsPage() {
   const canCreateOrg = can('organization', 'create')
   const canUpdateOrg = can('organization', 'update')
   const canDeleteOrg = can('organization', 'delete')
-  const canInvite = can('organization', 'invite')
+  const canManageMembers = can('organization', 'invite')
 
   // Check slug availability with debounce
   const handleSlugChange = async (slug: string) => {
@@ -239,7 +239,7 @@ export function OrganizationsPage() {
   }
 
   const handleOpenAddMemberDialog = async () => {
-    if (!canInvite) {
+    if (!canManageMembers) {
       toast.error("You do not have permission to invite members")
       return
     }
@@ -261,7 +261,7 @@ export function OrganizationsPage() {
 
   const handleAddMember = async () => {
     if (!selectedOrg || !addMemberData.userId) return
-    if (!canInvite) {
+    if (!canManageMembers) {
       toast.error("You do not have permission to invite members")
       return
     }
@@ -282,7 +282,7 @@ export function OrganizationsPage() {
 
   const handleRemoveMember = async () => {
     if (!selectedOrg || !selectedMember) return
-    if (!canInvite) {
+    if (!canManageMembers) {
       toast.error("You do not have permission to remove members")
       return
     }
@@ -302,7 +302,7 @@ export function OrganizationsPage() {
 
   const handleUpdateRole = async (memberId: string, newRole: "admin" | "manager" | "member") => {
     if (!selectedOrg) return
-    if (!canInvite) {
+    if (!canManageMembers) {
       toast.error("You do not have permission to update member roles")
       return
     }
@@ -456,7 +456,7 @@ export function OrganizationsPage() {
                 {selectedOrg ? `Manage members` : "Select an organization"}
               </CardDescription>
             </div>
-            {selectedOrg && canInvite && (
+            {selectedOrg && canManageMembers && (
               <Button onClick={handleOpenAddMemberDialog}>
                 <IconUsers className="mr-2 h-4 w-4" />
                 Add Member
@@ -529,7 +529,7 @@ export function OrganizationsPage() {
                                           handleUpdateRole(member.id, value)
                                         }
                                       }}
-                                      disabled={isOnlyAdmin || !canInvite}
+                                      disabled={isOnlyAdmin || !canManageMembers}
                                     >
                                       <SelectTrigger className="w-32">
                                         <SelectValue placeholder="Select role" />
@@ -549,7 +549,7 @@ export function OrganizationsPage() {
                                 })()}
                               </td>
                               <td className="p-3 text-right">
-                                {canInvite && (
+                                {canManageMembers && (
                                   <Button
                                     variant="ghost"
                                     size="sm"
