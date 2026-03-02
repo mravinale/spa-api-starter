@@ -20,6 +20,8 @@ export default defineConfig({
         'src/vite-env.d.ts',
         '**/*.test.{ts,tsx}',
         '**/*.spec.{ts,tsx}',
+        'src/shared/components/ui/dropdown-menu.tsx',
+        'src/shared/components/ui/separator.tsx',
       ],
     },
   },

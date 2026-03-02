@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 
@@ -38,6 +39,11 @@ function TestConsumer({ resource, action }: { resource: string; action: string }
       <div data-testid="can">{String(can(resource, action))}</div>
     </div>
   );
+}
+
+function TestRefetch() {
+  const { refetchPermissions } = usePermissionsContext();
+  return <button onClick={refetchPermissions}>Refetch</button>;
 }
 
 describe("PermissionsContext", () => {
@@ -124,6 +130,33 @@ describe("PermissionsContext", () => {
     await waitFor(() => {
       expect(screen.getByTestId("can").textContent).toBe("false");
     });
+  });
+
+  it("refetchPermissions invalidates the permissions query cache", async () => {
+    mockUseAuth.mockReturnValue({
+      user: { id: "admin-1", role: "admin" },
+      isAuthenticated: true,
+      isAdminOrManager: true,
+    });
+    mockGetMyPermissions.mockResolvedValue(["user:read"]);
+
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const invalidateSpy = vi.spyOn(queryClient, "invalidateQueries");
+
+    const user = userEvent.setup();
+    render(
+      <QueryClientProvider client={queryClient}>
+        <PermissionsProvider>
+          <TestRefetch />
+        </PermissionsProvider>
+      </QueryClientProvider>,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Refetch" }));
+
+    expect(invalidateSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ queryKey: ["rbac", "my-permissions"] }),
+    );
   });
 
   it("can() returns false for unauthenticated user", async () => {
