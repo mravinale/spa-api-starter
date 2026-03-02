@@ -224,7 +224,7 @@ export function RolesPage() {
   }, [roles, fetchRolePermissions]);
 
   const handleCreateRole = async () => {
-    if (!canCreateRole) {
+    if (!canCreateRole || user?.role !== 'admin') {
       toast.error("You do not have permission to create roles");
       return;
     }
@@ -344,7 +344,7 @@ export function RolesPage() {
             Manage role-based access control for your application
           </p>
         </div>
-        {canCreateRole && (
+        {canCreateRole && user?.role === 'admin' && (
           <Button onClick={() => setCreateDialogOpen(true)}>
             <IconPlus className="h-4 w-4 mr-2" />
             Create Role

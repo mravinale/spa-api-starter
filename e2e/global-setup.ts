@@ -14,12 +14,6 @@ async function ensureDefaultRolePermissions(pool: Pool): Promise<void> {
      ON CONFLICT DO NOTHING`,
   );
 
-  // Clear existing manager permissions to ensure clean state
-  await pool.query(
-    `DELETE FROM role_permissions
-     WHERE role_id = (SELECT id FROM roles WHERE name = 'manager')`,
-  );
-
   const managerPermissions = [
     ['user', 'read'],
     ['user', 'update'],
@@ -33,15 +27,33 @@ async function ensureDefaultRolePermissions(pool: Pool): Promise<void> {
     ['role', 'update'],
   ] as const;
 
-  for (const [resource, action] of managerPermissions) {
-    await pool.query(
-      `INSERT INTO role_permissions (role_id, permission_id)
-       SELECT r.id, p.id
-       FROM roles r
-       JOIN permissions p ON p.resource = $2 AND p.action = $3
-       WHERE r.name = $1`,
-      ['manager', resource, action],
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    // Clear existing manager permissions to ensure clean state
+    await client.query(
+      `DELETE FROM role_permissions
+       WHERE role_id = (SELECT id FROM roles WHERE name = 'manager')`,
     );
+
+    for (const [resource, action] of managerPermissions) {
+      await client.query(
+        `INSERT INTO role_permissions (role_id, permission_id)
+         SELECT r.id, p.id
+         FROM roles r
+         JOIN permissions p ON p.resource = $2 AND p.action = $3
+         WHERE r.name = $1`,
+        ['manager', resource, action],
+      );
+    }
+
+    await client.query('COMMIT');
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
   }
 
   const memberPermissions = [
