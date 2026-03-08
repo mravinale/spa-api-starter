@@ -16,6 +16,7 @@ const {
   mockUseDeleteRole,
   mockUseAssignPermissions,
   mockCan,
+  mockUseAuth,
   mockToastSuccess,
   mockToastError,
 } = vi.hoisted(() => ({
@@ -26,6 +27,7 @@ const {
   mockUseDeleteRole: vi.fn(),
   mockUseAssignPermissions: vi.fn(),
   mockCan: vi.fn(),
+  mockUseAuth: vi.fn(),
   mockToastSuccess: vi.fn(),
   mockToastError: vi.fn(),
 }));
@@ -41,6 +43,10 @@ vi.mock("../hooks/useRoles", () => ({
 
 vi.mock("@/shared/context/PermissionsContext", () => ({
   usePermissionsContext: () => ({ can: mockCan }),
+}));
+
+vi.mock("@/shared/context/AuthContext", () => ({
+  useAuth: () => mockUseAuth(),
 }));
 
 vi.mock("sonner", () => ({
@@ -134,6 +140,9 @@ describe("RolesPage", () => {
     mockUseDeleteRole.mockReturnValue({ mutateAsync: vi.fn(), isPending: false });
     mockUseAssignPermissions.mockReturnValue({ mutateAsync: vi.fn(), isPending: false });
     mockCan.mockReturnValue(false);
+    mockUseAuth.mockReturnValue({
+      user: { role: "member" },
+    });
 
     vi.stubGlobal(
       "fetch",
@@ -153,6 +162,9 @@ describe("RolesPage", () => {
       isLoading: false,
     });
     mockCan.mockImplementation((resource: string, action: string) => resource === "role" && action === "create");
+    mockUseAuth.mockReturnValue({
+      user: { role: "admin" },
+    });
 
     render(<RolesPage />);
 
@@ -173,6 +185,9 @@ describe("RolesPage", () => {
       color: "gray",
     });
     mockCan.mockImplementation((resource: string, action: string) => resource === "role" && action === "create");
+    mockUseAuth.mockReturnValue({
+      user: { role: "admin" },
+    });
 
     render(<RolesPage />);
 

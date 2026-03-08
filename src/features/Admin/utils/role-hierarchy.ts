@@ -16,6 +16,17 @@ export function getRoleLevel(role: string): number {
   return ROLE_HIERARCHY[role] ?? 0;
 }
 
+ export function filterAssignableRoles(
+   allRoles: string[],
+   requesterRole: string,
+ ): string[] {
+   const requesterLevel = getRoleLevel(requesterRole);
+   return allRoles.filter((role) => {
+     const roleLevel = ROLE_HIERARCHY[role];
+     return roleLevel !== undefined && roleLevel <= requesterLevel;
+   });
+ }
+
 /**
  * Filter roles to only those visible to the given requester role.
  * A user can only view roles strictly below their own level.
