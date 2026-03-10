@@ -10,7 +10,7 @@ import {
   AcceptInvitationPage,
 } from "@features/Auth";
 import { DashboardPage, SettingsPage, AccountPage } from "@features/Dashboard";
-import { UsersPage, SessionsPage, OrganizationsPage, InvitationsPage, RolesPage } from "@features/Admin";
+import { UsersPage, SessionsPage, OrganizationsPage, RolesPage } from "@features/Admin";
 import RootLayout from "./RootLayout";
 import { ThemeProvider } from "@shared/components/ui";
 import { AuthProvider } from "@shared/context/AuthContext";
@@ -84,15 +84,6 @@ const AppRoutesContent = () => {
                         </AdminRoute>
                       }
                     />
-                    <Route
-                      path="admin/invitations"
-                      element={
-                        <AdminRoute requiredPermission={{ resource: "organization", action: "read" }}>
-                          <InvitationsPage />
-                        </AdminRoute>
-                      }
-                    />
-
                     {/* User pages */}
                     <Route path="settings" element={<SettingsPage />} />
                     <Route path="account" element={<AccountPage />} />
